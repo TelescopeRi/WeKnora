@@ -10,10 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Tencent/WeKnora/internal/agent/tools"
 	"github.com/Tencent/WeKnora/internal/application/access"
 	"github.com/Tencent/WeKnora/internal/application/repository"
-	chatpipeline "github.com/Tencent/WeKnora/internal/application/service/chat_pipeline"
 	"github.com/Tencent/WeKnora/internal/application/service/retriever"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/logger"
@@ -353,7 +351,7 @@ func (s *ChunkExtractService) Handle(ctx context.Context, t *asynq.Task) error {
 			},
 		},
 	}
-	extractor := chatpipeline.NewExtractor(chatModel, template)
+	extractor := NewExtractor(chatModel, template)
 	graph, err := extractor.Extract(ctx, chunk.Content)
 	if err != nil {
 		handleErr = err
@@ -638,7 +636,7 @@ func (s *DataTableSummaryService) processTableData(ctx context.Context, resource
 	// 创建DuckDB会话并加载数据
 	sessionID := fmt.Sprintf("table_summary_%s", resources.knowledge.ID)
 	fileSvc := s.resolveFileServiceForKnowledge(ctx, resources)
-	duckdbTool := tools.NewDataAnalysisTool(s.knowledgeBaseService, s.knowledgeService, s.tenantService, fileSvc, s.sqlDB, sessionID, s.storageResolver)
+	duckdbTool := NewDataAnalysisTool(s.knowledgeBaseService, s.knowledgeService, s.tenantService, fileSvc, s.sqlDB, sessionID, s.storageResolver)
 	defer duckdbTool.Cleanup(ctx)
 
 	// 使用knowledge.ID作为表名，根据文件类型自动加载数据
@@ -651,9 +649,9 @@ func (s *DataTableSummaryService) processTableData(ctx context.Context, resource
 	logger.Infof(ctx, "Loaded table %s with %d columns and %d rows", tableSchema.TableName, len(tableSchema.Columns), tableSchema.RowCount)
 
 	// 获取样本数据用于生成摘要
-	input := tools.DataAnalysisInput{
+	input := DataAnalysisInput{
 		KnowledgeID: resources.knowledge.ID,
-		SQL:         fmt.Sprintf("SELECT * FROM \"%s\" LIMIT 10", tools.DataAnalysisTableName),
+		SQL:         fmt.Sprintf("SELECT * FROM \"%s\" LIMIT 10", DataAnalysisTableName),
 	}
 	jsonData, err := json.Marshal(input)
 	if err != nil {
@@ -681,7 +679,7 @@ func (s *DataTableSummaryService) processTableData(ctx context.Context, resource
 	}
 	// The stored summary is later shown to the model by data_schema, so it
 	// must name the model-facing table, never the physical knowledge-ID table.
-	tableDescription, err := s.generateTableDescription(ctx, resources.chatModel, tools.DataAnalysisTableName,
+	tableDescription, err := s.generateTableDescription(ctx, resources.chatModel, DataAnalysisTableName,
 		schemaDesc, sampleDesc, customInstructions)
 	if err != nil {
 		logger.Errorf(ctx, "failed to generate table description: %v", err)
@@ -689,7 +687,7 @@ func (s *DataTableSummaryService) processTableData(ctx context.Context, resource
 	}
 	logger.Debugf(ctx, "table describe of knowledge %s: %s", resources.knowledge.ID, tableDescription)
 
-	columnDescription, err := s.generateColumnDescriptions(ctx, resources.chatModel, tools.DataAnalysisTableName,
+	columnDescription, err := s.generateColumnDescriptions(ctx, resources.chatModel, DataAnalysisTableName,
 		schemaDesc, sampleDesc, customInstructions)
 	if err != nil {
 		logger.Errorf(ctx, "failed to generate column descriptions: %v", err)

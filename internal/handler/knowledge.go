@@ -33,7 +33,6 @@ type KnowledgeHandler struct {
 	kgService         interfaces.KnowledgeService
 	kbService         interfaces.KnowledgeBaseService
 	kbShareService    interfaces.KBShareService
-	agentShareService interfaces.AgentShareService
 	chunkService      interfaces.ChunkService
 	systemSettingSvc  interfaces.SystemSettingService
 	userSvc           interfaces.UserService
@@ -81,7 +80,6 @@ func NewKnowledgeHandler(
 	kgService interfaces.KnowledgeService,
 	kbService interfaces.KnowledgeBaseService,
 	kbShareService interfaces.KBShareService,
-	agentShareService interfaces.AgentShareService,
 	chunkService interfaces.ChunkService,
 	systemSettingSvc interfaces.SystemSettingService,
 	userSvc interfaces.UserService,
@@ -99,8 +97,7 @@ func NewKnowledgeHandler(
 		kgService:         kgService,
 		kbService:         kbService,
 		kbShareService:    kbShareService,
-		agentShareService: agentShareService,
-		chunkService:      chunkService,
+			chunkService:      chunkService,
 		systemSettingSvc:  systemSettingSvc,
 		userSvc:           userSvc,
 		asynqClient:       asynqClient,
@@ -147,7 +144,7 @@ func (h *KnowledgeHandler) validateKnowledgeBaseAccessWithKBID(
 	kbID string,
 ) (*types.KnowledgeBase, string, uint64, types.OrgMemberRole, error) {
 	kbID = secutils.SanitizeForLog(kbID)
-	grant, err := resolveHandlerKBAccess(c, kbID, h.kbService, h.kbShareService, h.agentShareService)
+	grant, err := resolveHandlerKBAccess(c, kbID, h.kbService, h.kbShareService)
 	if err != nil {
 		return nil, kbID, 0, "", err
 	}
@@ -163,7 +160,6 @@ func (h *KnowledgeHandler) validateKnowledgeBaseWriteAccessWithKBID(
 		kbID,
 		h.kbService,
 		h.kbShareService,
-		h.agentShareService,
 		types.OrgRoleEditor,
 	)
 	if err != nil {
@@ -202,7 +198,7 @@ func (h *KnowledgeHandler) resolveKnowledgeAndValidateKBAccess(
 		return knowledge, grant.Context(ctx), nil
 	}
 	kb := &types.KnowledgeBase{ID: knowledge.KnowledgeBaseID, TenantID: knowledge.TenantID}
-	grant, err := access.ResolveKB(ctx, request, kb, requiredPermission, h.kbShareService, h.agentShareService)
+	grant, err := access.ResolveKB(ctx, request, kb, requiredPermission, h.kbShareService)
 	if goerrors.Is(err, access.ErrForbidden) {
 		return nil, ctx, errors.NewForbiddenError("Permission denied to access this knowledge")
 	}
@@ -1967,30 +1963,6 @@ func (h *KnowledgeHandler) GetKnowledgeBatch(c *gin.Context) {
 		c.Error(errors.NewBadRequestError("Invalid request parameters").WithDetails(err.Error()))
 		return
 	}
-	if _, parseErr := types.ParseAgentSourceTenantID(c.Query(types.AgentSourceTenantIDParam)); parseErr != nil {
-		c.Error(errors.NewBadRequestError(parseErr.Error()))
-		return
-	}
-
-	// A nil scope means no agent selector. Every resolved scope, including
-	// mode=all, binds results to the authorized agent's source tenant.
-	var agentScope *types.SharedAgentKBScope
-	if agentID := secutils.SanitizeForLog(req.AgentID); agentID != "" {
-		agent, err := resolveSharedAgentForRequest(c, agentID, h.agentShareService)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		ctx = access.WithSharedAgent(ctx, agent)
-		scope := types.NewSharedAgentKBScope(agent)
-		agentScope = &scope
-		effectiveTenantID = agent.TenantID
-		if scope.IsEmpty() {
-			c.JSON(http.StatusOK, gin.H{"success": true, "data": []*types.Knowledge{}})
-			return
-		}
-	}
-
 	var knowledges []*types.Knowledge
 	var err error
 
@@ -2004,11 +1976,8 @@ func (h *KnowledgeHandler) GetKnowledgeBatch(c *gin.Context) {
 			_ = c.Error(accessErr)
 			return
 		}
-		if agentScope != nil && !agentScope.Allows(kbID, effID) {
-			c.Error(errors.NewForbiddenError("Knowledge base not accessible through this agent"))
-			return
-		}
 		scopeKBID = kbID
+
 		effectiveTenantID = effID
 		ctx = types.WithExecutionTenant(c.Request.Context(), effectiveTenantID)
 
@@ -2016,11 +1985,8 @@ func (h *KnowledgeHandler) GetKnowledgeBatch(c *gin.Context) {
 			effectiveTenantID, len(req.IDs))
 
 		knowledges, err = h.kgService.GetKnowledgeBatch(ctx, effectiveTenantID, req.IDs)
-	} else if agentScope != nil {
-		// Keep the authorized agent's read scope and the original caller.
-		ctx = types.WithExecutionTenant(ctx, effectiveTenantID)
-		knowledges, err = h.kgService.GetKnowledgeBatch(ctx, effectiveTenantID, req.IDs)
 	} else {
+
 		knowledges, err = h.kgService.GetKnowledgeBatchWithSharedAccess(ctx, effectiveTenantID, req.IDs)
 	}
 	if err != nil {
@@ -2029,14 +1995,11 @@ func (h *KnowledgeHandler) GetKnowledgeBatch(c *gin.Context) {
 		return
 	}
 
-	// Build the effective allowed-KB set from explicit kb_id, shared agent
-	// scope, and per-API-key KB restrictions.
+	// Build the effective allowed-KB set from explicit kb_id and per-API-key
+	// KB restrictions.
 	var allowedKBSet map[string]bool
 	if scopeKBID != "" {
 		allowedKBSet = map[string]bool{scopeKBID: true}
-	}
-	if agentScope != nil {
-		knowledges = filterKnowledgeByAgentScope(knowledges, *agentScope)
 	}
 
 	if apiKeySet := tenantAPIKeyAllowedKBSet(ctx); apiKeySet != nil {
@@ -2645,71 +2608,6 @@ func (h *KnowledgeHandler) SearchKnowledge(c *gin.Context) {
 				fileTypes = append(fileTypes, ft)
 			}
 		}
-	}
-
-	agentID := c.Query("agent_id")
-	if agentID != "" {
-		agent, err := resolveSharedAgentForRequest(c, agentID, h.agentShareService)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		sourceTenantID := agent.TenantID
-		ctx = access.WithSharedAgent(ctx, agent)
-		scope := types.NewSharedAgentKBScope(agent)
-		if scope.IsEmpty() {
-			c.JSON(http.StatusOK, gin.H{
-				"success":  true,
-				"data":     []interface{}{},
-				"has_more": false,
-				"total":    0,
-			})
-			return
-		}
-		var scopes []types.KnowledgeSearchScope
-		if !scope.IsAll() {
-			for _, kbID := range scope.IDs() {
-				if kbID != "" {
-					scopes = append(scopes, types.KnowledgeSearchScope{TenantID: sourceTenantID, KBID: kbID})
-				}
-			}
-		}
-		if scope.IsAll() {
-			kbs, err := h.kbService.ListKnowledgeBasesByTenantID(ctx, sourceTenantID)
-			if err != nil {
-				logger.ErrorWithFields(ctx, err, nil)
-				c.Error(errors.NewInternalServerError("Failed to list knowledge bases").WithDetails(err.Error()))
-				return
-			}
-			for _, kb := range filterKnowledgeBasesForSharedAgent(kbs, agent) {
-				if kb.Type == types.KnowledgeBaseTypeDocument {
-					scopes = append(scopes, types.KnowledgeSearchScope{TenantID: kb.TenantID, KBID: kb.ID})
-				}
-			}
-		}
-		scopes = filterKnowledgeSearchScopesForAPIKey(ctx, scopes)
-		if len(scopes) == 0 {
-			c.JSON(http.StatusOK, gin.H{
-				"success":  true,
-				"data":     []interface{}{},
-				"has_more": false,
-				"total":    0,
-			})
-			return
-		}
-		knowledges, hasMore, total, err := h.kgService.SearchKnowledgeForScopes(ctx, scopes, keyword, offset, limit, fileTypes)
-		if err != nil {
-			logger.ErrorWithFields(ctx, err, nil)
-			c.Error(errors.NewInternalServerError("Failed to search knowledge").WithDetails(err.Error()))
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{
-			"success":  true,
-			"data":     knowledges,
-			"has_more": hasMore,
-			"total":    total,
-		})
-		return
 	}
 
 	if scopes, restricted := tenantAPIKeySearchScopes(ctx); restricted {

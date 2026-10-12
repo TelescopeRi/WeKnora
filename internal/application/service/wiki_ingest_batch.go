@@ -12,7 +12,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/Tencent/WeKnora/internal/agent"
 	apprepo "github.com/Tencent/WeKnora/internal/application/repository"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/models/chat"
@@ -1479,7 +1478,7 @@ func (s *wikiIngestService) mapOneDocument(
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		summaryContent, summaryErr = s.generateWithTemplate(ctx, chatModel, agent.WikiSummaryPrompt, map[string]string{
+		summaryContent, summaryErr = s.generateWithTemplate(ctx, chatModel, WikiSummaryPrompt, map[string]string{
 			"Content":            content,
 			"Language":           lang,
 			"ExtractedSlugs":     slugListing,
@@ -1780,7 +1779,7 @@ func (s *wikiIngestService) extractEntitiesAndConceptsNoUpsert(
 		prevSlugsText = "(none — this is a new document)"
 	}
 
-	extractionJSON, err := s.generateWithTemplate(ctx, chatModel, agent.WikiKnowledgeExtractPrompt, map[string]string{
+	extractionJSON, err := s.generateWithTemplate(ctx, chatModel, WikiKnowledgeExtractPrompt, map[string]string{
 		"Content":            content,
 		"Language":           lang,
 		"PreviousSlugs":      prevSlugsText,
@@ -2192,7 +2191,7 @@ func (s *wikiIngestService) reduceSlugUpdates(
 		pageAliases := strings.Join(page.Aliases, ", ")
 
 		var updatedContent string
-		updatedContent, err = s.generateWithTemplate(ctx, chatModel, agent.WikiPageModifyUserPrompt, map[string]string{
+		updatedContent, err = s.generateWithTemplate(ctx, chatModel, WikiPageModifyUserPrompt, map[string]string{
 			"HasAdditions":            hasAdditionsStr,
 			"HasRetractions":          hasRetractionsStr,
 			"PageSlug":                slug,

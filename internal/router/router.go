@@ -13,12 +13,9 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/dig"
 
-	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/handler"
-	"github.com/Tencent/WeKnora/internal/handler/session"
 	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/mcpserver"
 	"github.com/Tencent/WeKnora/internal/middleware"
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
@@ -36,12 +33,8 @@ type RouterParams struct {
 	KBService                    interfaces.KnowledgeBaseService
 	KnowledgeService             interfaces.KnowledgeService
 	ChunkService                 interfaces.ChunkService
-	SessionService               interfaces.SessionService
-	MessageService               interfaces.MessageService
 	ModelService                 interfaces.ModelService
-	EvaluationService            interfaces.EvaluationService
 	KBShareService               interfaces.KBShareService
-	AgentShareService            interfaces.AgentShareService
 	KBHandler                    *handler.KnowledgeBaseHandler
 	KnowledgeHandler             *handler.KnowledgeHandler
 	TenantHandler                *handler.TenantHandler
@@ -53,15 +46,8 @@ type RouterParams struct {
 	AuditLogHandler              *handler.AuditLogHandler
 	AuditLogService              interfaces.AuditLogService
 	ChunkHandler                 *handler.ChunkHandler
-	SessionHandler               *session.Handler
-	MessageHandler               *handler.MessageHandler
-	MessageSuggestionHandler     *handler.MessageSuggestionHandler
 	ModelHandler                 *handler.ModelHandler
 	ModelCredentialsHandler      *handler.ModelCredentialsHandler
-	SandboxConfigHandler         *handler.SandboxConfigHandler
-	SandboxSkillHandler          *handler.SandboxSkillHandler
-	MeEnvVarHandler              *handler.MeEnvVarHandler
-	EvaluationHandler            *handler.EvaluationHandler
 	AuthHandler                  *handler.AuthHandler
 	InitializationHandler        *handler.InitializationHandler
 	SystemHandler                *handler.SystemHandler
@@ -77,23 +63,15 @@ type RouterParams struct {
 	ResourceCatalog              interfaces.ResourceCatalog
 	FAQHandler                   *handler.FAQHandler
 	TagHandler                   *handler.TagHandler
-	CustomAgentHandler           *handler.CustomAgentHandler
 	UserFavoriteHandler          *handler.UserResourceFavoriteHandler
-	SkillHandler                 *handler.SkillHandler
 	OrganizationHandler          *handler.OrganizationHandler
-	IMHandler                    *handler.IMHandler
-	EmbedChannelHandler          *handler.EmbedChannelHandler
-	EmbedChannelService          interfaces.EmbedChannelService
 	MCPEndpointHandler           *handler.MCPEndpointHandler
 	MCPEndpointService           interfaces.MCPEndpointService
-	MCPServer                    *mcpserver.Server
 	RedisClient                  *redis.Client
 	DataSourceHandler            *handler.DataSourceHandler
 	DataSourceCredentialsHandler *handler.DataSourceCredentialsHandler
 	WeKnoraCloudHandler          *handler.WeKnoraCloudHandler
 	WikiPageHandler              *handler.WikiPageHandler
-	MemoryHandler                *handler.MemoryHandler
-	HostSandbox                  service.HostSandboxManager
 }
 
 // NewRouter 创建新的路由
@@ -105,7 +83,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 
 	// Trusted proxies: gin defaults to trusting ALL proxies, which makes
 	// c.ClientIP() honor a client-supplied X-Forwarded-For. Public, unauthed
-	// embed endpoints rate-limit per (channel, ClientIP), so a spoofed XFF would
+	// endpoints rate-limit per ClientIP, so a spoofed XFF would
 	// trivially bypass the limiter. Restrict to the fronting proxy network so
 	// only the real client IP (appended by nginx) is returned. Configurable via
 	// WEKNORA_TRUSTED_PROXIES (comma-separated CIDRs/IPs).
@@ -124,12 +102,9 @@ func NewRouter(params RouterParams) *gin.Engine {
 		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{
 			"Origin", "Content-Type", "Accept", "Authorization", "X-API-Key", "X-Request-ID", "X-Tenant-ID",
-			"X-Embed-Session", "X-External-User-ID", "X-External-User-Token", "X-WeKnora-Desktop-Token",
-			// Streamable HTTP MCP clients running in a browser send these on
-			// the /mcp/:endpoint_id surface.
-			"MCP-Protocol-Version", "Mcp-Session-Id", "Last-Event-ID",
+			"X-External-User-ID", "X-External-User-Token", "X-WeKnora-Desktop-Token",
 		},
-		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "Mcp-Session-Id"},
+		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
@@ -157,52 +132,14 @@ func NewRouter(params RouterParams) *gin.Engine {
 		))
 	}
 
-	// Embed page framing policy: emit a per-channel `frame-ancestors` CSP so the
-	// embed SPA page (/embed/:channelId) can only be iframed by the channel's
-	// allowed origins. This is the page-level counterpart to the API Origin
-	// allowlist enforced in EmbedAuth. Registered before the static handler so
-	// it runs for the embed HTML response.
-	if params.EmbedChannelService != nil {
-		r.Use(embedFrameAncestorsMiddleware(params.EmbedChannelService))
-	}
-
 	// 前端静态文件（仅 Lite 版本内嵌前端）
 	if handler.Edition == "lite" {
 		serveFrontendStatic(r)
 	}
 
-	// IM 回调路由（在认证中间件之前注册，使用各平台自身的签名验证）
-	RegisterIMRoutes(r, params.IMHandler)
-
-	// Web embed 公开路由（使用 publish token 鉴权，不走全局 Auth）
-	RegisterEmbedPublicRoutes(
-		r,
-		params.EmbedChannelHandler,
-		params.EmbedChannelService,
-		params.TenantService,
-		params.RedisClient,
-		params.FileService,
-		params.StorageBackendResolver,
-		params.ResourceCatalog,
-	)
-
-	// Workspace MCP server surface (/mcp/:endpoint_id): bearer-token auth per
-	// endpoint, so it must precede the global Auth middleware.
-	RegisterMCPServerRoutes(r, params.MCPServer, params.MCPEndpointService, params.TenantService)
-
-	// Short-lived capability URLs for IM and other clients that cannot attach
-	// WeKnora authentication headers.
+	// Short-lived capability URLs for clients that cannot attach WeKnora
+	// authentication headers.
 	serveResourceGrants(r, params.ResourceCatalog, params.TenantService, params.FileService, params.StorageBackendResolver)
-
-	// Sandbox terminal WebSocket (self-authenticated via a short-lived
-	// query ticket — see RegisterSandboxTerminalRoutes; browsers cannot set
-	// auth headers on the WS handshake, so this must precede the global Auth
-	// middleware). The ticket is minted by an authenticated POST.
-	RegisterSandboxTerminalRoutes(r, params.SessionHandler)
-	RegisterSandboxDesktopRoutes(r, params.SessionHandler)
-	r.GET("/api/v1/local-browser/extension", params.SessionHandler.BrowserSkillExtension)
-	r.POST("/api/v1/local-browser/extension/authorize", params.SessionHandler.BrowserSkillAuthorize)
-	r.POST("/api/v1/local-browser/internal", params.SessionHandler.BrowserSkillInternal)
 
 	// 认证中间件
 	r.Use(middleware.Auth(params.TenantService, params.UserService, params.TenantMemberService, params.TenantAPIKeyService, params.Config))
@@ -238,7 +175,6 @@ func NewRouter(params RouterParams) *gin.Engine {
 		rbacGuards := newRBACGuards(
 			params.Config,
 			params.KBHandler,
-			params.CustomAgentHandler,
 			params.KnowledgeHandler,
 			params.ChunkHandler,
 			params.WikiPageHandler,
@@ -246,7 +182,6 @@ func NewRouter(params RouterParams) *gin.Engine {
 			params.KnowledgeService,
 			params.ChunkService,
 			params.KBShareService,
-			params.AgentShareService,
 		)
 
 		// API-key gate: single authority for X-API-Key principals. Runs
@@ -263,7 +198,7 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterImageAttrRoutes(v1, params.KBHandler, rbacGuards)
 		RegisterKnowledgeBaseActivityRoutes(v1, params.AuditLogHandler, rbacGuards)
 		// KB-scoped image proxy: lets tenants render images embedded in
-		// org-shared / agent-visible KB content, which the tenant-scoped
+		// org-shared KB content, which the tenant-scoped
 		// /files route cannot serve because it enforces same-tenant paths.
 		serveKBScopedFiles(
 			v1,
@@ -273,39 +208,11 @@ func NewRouter(params RouterParams) *gin.Engine {
 			params.StorageBackendResolver,
 			params.ResourceCatalog,
 		)
-		// Message-scoped image proxy: shared-agent replies belong to the
-		// caller's session but may reference resources stored in the agent's
-		// source workspace. Authorization is derived from the persisted message,
-		// never from a client-provided workspace ID. Replies produced by the
-		// caller's own agent over an org-shared KB fall back to the KB share
-		// relation instead (#3022).
-		serveMessageScopedFiles(
-			v1,
-			rbacGuards,
-			params.MessageService,
-			params.AgentShareService,
-			params.TenantService,
-			params.FileService,
-			params.StorageBackendResolver,
-			params.ResourceCatalog,
-			params.KBShareService,
-			params.KBService,
-			params.KnowledgeService,
-		)
 		RegisterKnowledgeTagRoutes(v1, params.TagHandler, rbacGuards)
 		RegisterKnowledgeRoutes(v1, params.KnowledgeHandler, rbacGuards)
 		RegisterFAQRoutes(v1, params.FAQHandler, rbacGuards)
 		RegisterChunkRoutes(v1, params.ChunkHandler, rbacGuards)
-		RegisterSessionRoutes(v1, params.SessionHandler, params.MessageSuggestionHandler, rbacGuards)
-		RegisterChatRoutes(v1, params.SessionHandler, rbacGuards)
-		RegisterMessageRoutes(v1, params.MessageHandler, rbacGuards)
 		RegisterModelRoutes(v1, params.ModelHandler, params.ModelCredentialsHandler, rbacGuards)
-		RegisterSandboxConfigRoutes(v1, params.SandboxConfigHandler, params.SandboxSkillHandler, rbacGuards)
-		RegisterMyEnvVarRoutes(v1, params.MeEnvVarHandler)
-		v1.GET("/me/browser", params.SessionHandler.BrowserSkillAccount)
-		v1.GET("/me/browser/extension", params.SessionHandler.BrowserSkillDownload)
-		v1.POST("/me/browser", params.SessionHandler.BrowserSkillAccount)
-		RegisterEvaluationRoutes(v1, params.EvaluationHandler, rbacGuards)
 		RegisterInitializationRoutes(v1, params.InitializationHandler, rbacGuards)
 		params.SystemHandler.BindDeploymentCapabilities(deploymentCapabilitiesFromRouter(params))
 		RegisterSystemRoutes(v1, params.SystemHandler, rbacGuards)
@@ -315,17 +222,12 @@ func NewRouter(params RouterParams) *gin.Engine {
 		RegisterWebSearchProviderRoutes(v1, params.WebSearchProviderHandler, params.WebSearchCredentialsHandler, rbacGuards)
 		RegisterVectorStoreRoutes(v1, params.VectorStoreHandler, rbacGuards)
 		RegisterStorageBackendRoutes(v1, params.StorageBackendHandler, rbacGuards)
-		RegisterCustomAgentRoutes(v1, params.CustomAgentHandler, rbacGuards)
 		RegisterUserFavoriteRoutes(v1, params.UserFavoriteHandler, rbacGuards)
-		RegisterSkillRoutes(v1, params.SkillHandler, rbacGuards)
 		RegisterOrganizationRoutes(v1, params.OrganizationHandler, rbacGuards)
-		RegisterIMChannelRoutes(v1, params.IMHandler, rbacGuards)
-		RegisterEmbedChannelRoutes(v1, params.EmbedChannelHandler, rbacGuards)
 		RegisterMCPEndpointRoutes(v1, params.MCPEndpointHandler, rbacGuards)
 		RegisterDataSourceRoutes(v1, params.DataSourceHandler, params.DataSourceCredentialsHandler, rbacGuards)
 		RegisterWeKnoraCloudRoutes(v1, params.WeKnoraCloudHandler, rbacGuards)
 		RegisterWikiPageRoutes(v1, params.WikiPageHandler, rbacGuards)
-		RegisterMemoryRoutes(v1, params.MemoryHandler, rbacGuards)
 		RegisterChunkerDebugRoutes(v1, rbacGuards)
 
 		// Fail fast if any declared API-key policy points at a route

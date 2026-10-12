@@ -8,9 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/modelcontext"
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/searchutil"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -94,12 +92,12 @@ func (s *wikiIngestService) extractCandidateSlugs(
 	}
 
 	granularity := batchCtx.ExtractionGranularity.Normalize()
-	raw, err := s.generateWithTemplate(ctx, chatModel, agent.WikiCandidateSlugPrompt, map[string]string{
+	raw, err := s.generateWithTemplate(ctx, chatModel, WikiCandidateSlugPrompt, map[string]string{
 		"Content":             content,
 		"Language":            lang,
 		"PreviousSlugs":       prevSlugsText,
 		"Granularity":         string(granularity),
-		"GranularityGuidance": agent.WikiGranularityGuidance(string(granularity)),
+		"GranularityGuidance": WikiGranularityGuidance(string(granularity)),
 		"CustomInstructions":  batchCtx.ExtractionInstructions,
 		"InstructionScope":    "wiki_extraction",
 	})
@@ -137,7 +135,7 @@ func (s *wikiIngestService) extractCandidateSlugs(
 // chunkBatch groups chunks that will be sent in a single WikiChunkCitationPrompt call.
 type chunkBatch struct {
 	chunks       []*types.Chunk
-	handles      *modelcontext.HandleTable
+	handles      *HandleTable
 	totalRuneLen int
 }
 
@@ -176,7 +174,7 @@ func splitChunksIntoCitationBatches(chunks []*types.Chunk) []chunkBatch {
 
 	var batches []chunkBatch
 	newBatch := func() chunkBatch {
-		return chunkBatch{handles: modelcontext.NewHandleTable("c", 3, 0)}
+		return chunkBatch{handles: NewHandleTable("c", 3, 0)}
 	}
 	current := newBatch()
 
@@ -281,7 +279,7 @@ func (s *wikiIngestService) classifyChunkCitations(
 		batchIdx := bi
 		eg.Go(func() error {
 			chunksXML := renderChunksXML(batch)
-			raw, err := s.generateWithTemplate(ectx, chatModel, agent.WikiChunkCitationPrompt, map[string]string{
+			raw, err := s.generateWithTemplate(ectx, chatModel, WikiChunkCitationPrompt, map[string]string{
 				"CandidateSlugs": candidatesXML,
 				"ChunksXML":      chunksXML,
 				"Language":       lang,

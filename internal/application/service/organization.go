@@ -47,7 +47,6 @@ type organizationService struct {
 	orgRepo        interfaces.OrganizationRepository
 	userRepo       interfaces.UserRepository
 	shareRepo      interfaces.KBShareRepository
-	agentShareRepo interfaces.AgentShareRepository
 }
 
 // NewOrganizationService creates a new organization service
@@ -55,13 +54,11 @@ func NewOrganizationService(
 	orgRepo interfaces.OrganizationRepository,
 	userRepo interfaces.UserRepository,
 	shareRepo interfaces.KBShareRepository,
-	agentShareRepo interfaces.AgentShareRepository,
 ) interfaces.OrganizationService {
 	return &organizationService{
 		orgRepo:        orgRepo,
 		userRepo:       userRepo,
 		shareRepo:      shareRepo,
-		agentShareRepo: agentShareRepo,
 	}
 }
 
@@ -260,9 +257,7 @@ func (s *organizationService) SearchSearchableOrganizations(ctx context.Context,
 		}
 		shares, _ := s.shareRepo.ListByOrganization(ctx, org.ID)
 		shareCounts[org.ID] = int64(len(shares))
-		if agentShares, err := s.agentShareRepo.ListByOrganization(ctx, org.ID); err == nil {
-			agentShareCounts[org.ID] = len(agentShares)
-		}
+
 		_, err := s.orgRepo.GetTenantMember(ctx, org.ID, tenantID)
 		memberOrgIDs[org.ID] = (err == nil)
 	}
@@ -344,9 +339,6 @@ func (s *organizationService) DeleteOrganization(ctx context.Context, id string,
 
 	if err := s.shareRepo.DeleteByOrganizationID(ctx, id); err != nil {
 		logger.Warnf(ctx, "Failed to delete KB shares for organization %s: %v", id, err)
-	}
-	if err := s.agentShareRepo.DeleteByOrganizationID(ctx, id); err != nil {
-		logger.Warnf(ctx, "Failed to delete agent shares for organization %s: %v", id, err)
 	}
 
 	return s.orgRepo.Delete(ctx, id)
@@ -433,9 +425,7 @@ func (s *organizationService) revokeTenantShares(ctx context.Context, orgID stri
 	if err := s.shareRepo.DeleteByOrganizationAndSourceTenant(ctx, orgID, tenantID); err != nil {
 		logger.Warnf(ctx, "Failed to revoke KB shares of tenant %d in organization %s: %v", tenantID, orgID, err)
 	}
-	if err := s.agentShareRepo.DeleteByOrganizationAndSourceTenant(ctx, orgID, tenantID); err != nil {
-		logger.Warnf(ctx, "Failed to revoke agent shares of tenant %d in organization %s: %v", tenantID, orgID, err)
-	}
+
 }
 
 // UpdateTenantMemberRole updates the role for a (org, tenant) membership.

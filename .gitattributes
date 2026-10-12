@@ -1,4 +1,7 @@
 *.sh text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+*.tsv text eol=lf
 
 # Force LF on Go source + JSON golden fixtures so Windows checkouts
 # (with default core.autocrlf=true) don't trip byte-equal comparisons in

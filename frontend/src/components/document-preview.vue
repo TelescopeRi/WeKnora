@@ -3,8 +3,6 @@
 import { indexEmbeddedSourceImages } from '@/utils/sourceImage';
 import { ref, shallowRef, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent } from 'vue';
 import { previewKnowledgeFile } from '@/api/knowledge-base/index';
-import { previewTemporaryAttachment } from '@/api/chat/temporary-attachments';
-import { downloadArtifact } from '@/api/chat';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
 import 'katex/dist/katex.min.css';
@@ -52,10 +50,6 @@ const { t } = useI18n();
 const props = defineProps<{
   sourceBlob?: Blob;
   knowledgeId?: string;
-  sessionId?: string;
-  attachmentId?: string;
-  messageId?: string;
-  artifactIndex?: number;
   fileType: string;
   fileName: string;
   active: boolean;
@@ -350,40 +344,19 @@ function getPreviewSourceKey(): string {
     return `resource-blob:${props.fileName}:${props.fileType}:${props.sourceBlob.size}:${props.sourceBlob.type}`;
   }
   if (props.knowledgeId) return `knowledge:${props.knowledgeId}`;
-  if (props.sessionId && props.attachmentId) return `attachment:${props.sessionId}:${props.attachmentId}`;
-  if (
-    props.sessionId &&
-    props.messageId &&
-    Number.isInteger(props.artifactIndex) &&
-    (props.artifactIndex as number) >= 0
-  ) {
-    return `artifact:${props.sessionId}:${props.messageId}:${props.artifactIndex}`;
-  }
   return '';
 }
 
-// Skill-generated HTML is often a self-contained chart that needs its own
-// scripts. Knowledge-base files and chat attachments are untrusted uploads:
-// they stay as source, matching the previous text preview.
+// Knowledge-base files are untrusted uploads: they stay as source,
+// matching the previous text preview.
 function allowsHtmlScriptPreview(): boolean {
-  return getPreviewSourceKey().startsWith('artifact:');
+  return false;
 }
 
 async function fetchPreviewBlob(): Promise<Blob> {
   if (props.sourceBlob) return props.sourceBlob;
   if (props.knowledgeId) {
     return previewKnowledgeFile(props.knowledgeId);
-  }
-  if (props.sessionId && props.attachmentId) {
-    return previewTemporaryAttachment(props.sessionId, props.attachmentId);
-  }
-  if (
-    props.sessionId &&
-    props.messageId &&
-    Number.isInteger(props.artifactIndex) &&
-    (props.artifactIndex as number) >= 0
-  ) {
-    return downloadArtifact(props.sessionId, props.messageId, props.artifactIndex as number);
   }
   throw new Error('Missing preview source');
 }
@@ -843,7 +816,7 @@ function applyLocate() {
 }
 
 watch(
-  () => [props.active, props.knowledgeId, props.sessionId, props.attachmentId, props.messageId, props.artifactIndex, props.sourceBlob, props.fileName, props.fileType],
+  () => [props.active, props.knowledgeId, props.sourceBlob, props.fileName, props.fileType],
   ([active]) => {
     if (active && getPreviewSourceKey()) {
       loadPreview();

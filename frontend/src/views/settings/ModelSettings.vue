@@ -212,46 +212,6 @@
             </p>
           </section>
 
-          <section v-if="usageConflict.agents.length" class="model-usage-group">
-            <h3>{{ $t('modelSettings.usage.agents', {
-              count: modelUsageResourceCount(usageConflict.agents, usageConflict.agent_total)
-            }) }}</h3>
-            <ul>
-              <li v-for="resource in usageConflict.agents" :key="resource.id">
-                <div class="model-usage-resource">
-                  <strong>{{ resource.name || resource.id }}</strong>
-                  <div class="model-usage-bindings">
-                    <t-tag
-                      v-for="(binding, index) in resource.bindings"
-                      :key="`${binding}-${index}`"
-                      size="small"
-                      variant="light"
-                    >
-                      {{ $t(modelUsageBindingI18nKey(binding)) }}
-                    </t-tag>
-                  </div>
-                </div>
-                <t-button
-                  theme="primary"
-                  variant="text"
-                  size="small"
-                  @click="openUsageResource('agent', resource.id, resource.bindings)"
-                >
-                  {{ $t('modelSettings.usage.openConfiguration') }}
-                </t-button>
-              </li>
-            </ul>
-            <p
-              v-if="modelUsageListTruncated(usageConflict.agents, usageConflict.agent_total)"
-              class="model-usage-truncated"
-            >
-              {{ $t('modelSettings.usage.truncated', {
-                shown: usageConflict.agents.length,
-                total: modelUsageResourceCount(usageConflict.agents, usageConflict.agent_total)
-              }) }}
-            </p>
-          </section>
-
           <section v-if="usageConflict.long_term_memory.bindings.length" class="model-usage-group">
             <h3>{{ $t('modelSettings.usage.longTermMemory') }}</h3>
             <div class="model-usage-memory">
@@ -344,9 +304,6 @@ const KNOWLEDGE_BASE_EDITOR_HOST_ROUTES = new Set([
   'home',
   'knowledgeBaseList',
   'knowledgeBaseDetail',
-  'globalCreatChat',
-  'kbCreatChat',
-  'chat',
 ])
 watch(
   () => uiStore.settingsInitialSubSection,

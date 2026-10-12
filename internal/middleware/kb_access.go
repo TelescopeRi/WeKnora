@@ -82,10 +82,10 @@ func KBIDFromParam(param string) KBIDResolver {
 // up the knowledge document, and returns its KB id. Used by the chunk
 // routes that address a chunk via /chunks/:knowledge_id.
 //
-// A genuine "not found" maps to 404; transient errors (DB hiccup,
-// service unavailable) are surfaced as a plain Go error so the guard
-// can return 503 instead of pretending the resource doesn't exist
-// (a 404 here would also short-circuit any retry / monitoring).
+// A genuine "not found" maps to 404; transient errors are surfaced as a
+// plain Go error so the guard can return 503 instead of pretending the
+// resource doesn't exist (a 404 here would also short-circuit any retry /
+// monitoring).
 func KBIDFromKnowledgeIDParam(param string, kgService KnowledgeLookup) KBIDResolver {
 	return func(c *gin.Context) (string, error) {
 		v := c.Param(param)
@@ -156,11 +156,10 @@ func isResourceNotFound(err error) bool {
 }
 
 // RequireKBAccess returns a gin.HandlerFunc that resolves KB access
-// (own / org-shared / via shared agent), enforces the minimum required
-// org-level permission, and on success stores the result under
-// KBAccessContextKey AND rewrites c.Request.Context() to carry the
-// effective tenant ID. Handlers downstream just read tenant from
-// context as before.
+// (own / org-shared), enforces the minimum required org-level permission,
+// and on success stores the result under KBAccessContextKey AND rewrites
+// c.Request.Context() to carry the effective tenant ID. Handlers downstream
+// just read tenant from context as before.
 //
 // On failure the guard aborts with the appropriate HTTP status (400 /
 // 401 / 404 / 403 / 503). Behaviour matches what each handler's
@@ -169,8 +168,7 @@ func isResourceNotFound(err error) bool {
 // gated route at once.
 //
 // Required permission semantics:
-//   - OrgRoleViewer -> read-only routes (the agent-share fallback path
-//     activates only at this level)
+//   - OrgRoleViewer -> read-only routes
 //   - OrgRoleEditor -> mutating routes (org-shared editor or own KB)
 //   - OrgRoleAdmin  -> share-management routes (only the original
 //     sharer / KB owner / Org admin should pass)
@@ -186,7 +184,6 @@ func RequireKBAccess(
 	requiredPermission types.OrgMemberRole,
 	kbService KBLookup,
 	kbShareService interfaces.KBShareService,
-	agentShareService interfaces.AgentShareService,
 	cfg *config.Config,
 ) gin.HandlerFunc {
 	warnOnNilConfig(cfg)
@@ -205,7 +202,7 @@ func RequireKBAccess(
 			return
 		}
 
-		grant, err := resolveKBAccess(ctx, c, kbID, requiredPermission, kbService, kbShareService, agentShareService)
+		grant, err := resolveKBAccess(ctx, c, kbID, requiredPermission, kbService, kbShareService)
 		switch {
 		case stderrors.Is(err, access.ErrUnauthorized):
 			_ = c.Error(apperrors.NewUnauthorizedError("Unauthorized"))
@@ -217,10 +214,6 @@ func RequireKBAccess(
 			return
 		case stderrors.Is(err, access.ErrForbidden):
 			_ = c.Error(apperrors.NewForbiddenError("Permission denied to access this knowledge base"))
-			c.Abort()
-			return
-		case stderrors.Is(err, access.ErrInvalidAgentSource):
-			_ = c.Error(apperrors.NewBadRequestError("invalid agent_source_tenant_id"))
 			c.Abort()
 			return
 		case err != nil:
@@ -260,9 +253,7 @@ func KBAccessRequest(c *gin.Context) access.KBRequest {
 		}
 	}
 	return access.KBRequest{
-		Caller:              caller,
-		AgentID:             c.Query("agent_id"),
-		AgentSourceTenantID: c.Query(types.AgentSourceTenantIDParam),
+		Caller: caller,
 	}
 }
 
@@ -273,7 +264,6 @@ func resolveKBAccess(
 	requiredPermission types.OrgMemberRole,
 	kbService KBLookup,
 	kbShareService interfaces.KBShareService,
-	agentShareService interfaces.AgentShareService,
 ) (*KBAccess, error) {
 	request := KBAccessRequest(c)
 	if request.Caller.TenantID == 0 {
@@ -286,5 +276,5 @@ func resolveKBAccess(
 		}
 		return nil, err
 	}
-	return access.ResolveKB(ctx, request, kb, requiredPermission, kbShareService, agentShareService)
+	return access.ResolveKB(ctx, request, kb, requiredPermission, kbShareService)
 }

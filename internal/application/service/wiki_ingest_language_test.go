@@ -7,7 +7,6 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/types"
 )
 
@@ -101,14 +100,14 @@ func TestResolveSlugUpdateLanguage(t *testing.T) {
 // instruction as "Write in ." and leaves the output language to the model.
 func TestWikiPromptsNeverRenderAnEmptyLanguage(t *testing.T) {
 	prompts := map[string]string{
-		"WikiPageModifyUserPrompt":   agent.WikiPageModifyUserPrompt,
-		"WikiSummaryPrompt":          agent.WikiSummaryPrompt,
-		"WikiIndexIntroPrompt":       agent.WikiIndexIntroPrompt,
-		"WikiIndexIntroUpdatePrompt": agent.WikiIndexIntroUpdatePrompt,
-		"WikiKnowledgeExtractPrompt": agent.WikiKnowledgeExtractPrompt,
-		"WikiCandidateSlugPrompt":    agent.WikiCandidateSlugPrompt,
-		"WikiChunkCitationPrompt":    agent.WikiChunkCitationPrompt,
-		"WikiTaxonomyPlanPrompt":     agent.WikiTaxonomyPlanPrompt,
+		"WikiPageModifyUserPrompt":   WikiPageModifyUserPrompt,
+		"WikiSummaryPrompt":          WikiSummaryPrompt,
+		"WikiIndexIntroPrompt":       WikiIndexIntroPrompt,
+		"WikiIndexIntroUpdatePrompt": WikiIndexIntroUpdatePrompt,
+		"WikiKnowledgeExtractPrompt": WikiKnowledgeExtractPrompt,
+		"WikiCandidateSlugPrompt":    WikiCandidateSlugPrompt,
+		"WikiChunkCitationPrompt":    WikiChunkCitationPrompt,
+		"WikiTaxonomyPlanPrompt":     WikiTaxonomyPlanPrompt,
 	}
 
 	for name, tpl := range prompts {

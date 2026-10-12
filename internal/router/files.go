@@ -27,9 +27,7 @@ import (
 //
 //   - /files                              tenant-scoped raw storage proxy
 //   - /api/v1/knowledge-bases/:id/files   KB-scoped proxy (shared-KB images)
-//   - /api/v1/sessions/:id/messages/:message_id/files
-//                                          message-scoped proxy (shared-agent output)
-//   - /api/v1/files/presigned             HMAC-signed anonymous access (IM)
+//   - /api/v1/files/presigned             HMAC-signed anonymous access
 //   - /api/v1/files/presigned-preview     Admin-only URL diagnostics
 //   - /r/:token                           short-lived capability URLs
 //
@@ -43,12 +41,6 @@ import (
 type getRouteRegistrar interface {
 	GET(string, ...gin.HandlerFunc) gin.IRoutes
 }
-
-type (
-	messageFileLookup        = access.MessageFileLookup
-	sharedAgentFileLookup    = access.SharedAgentFileLookup
-	messageKBShareAuthorizer = access.MessageKBShareAuthorizer
-)
 
 // localStorageBaseDir resolves LOCAL_STORAGE_BASE_DIR with the container
 // default.
@@ -154,10 +146,8 @@ func streamStoredFile(c *gin.Context, reader io.ReadCloser, contentType string, 
 }
 
 // newFileServeHandler builds the file-proxy handler. It reads the tenant from
-// the request context (set by whichever auth middleware precedes it), so the
-// same handler backs both the authenticated /files route and the embed route
-// (where EmbedAuth injects the channel's tenant). Tenant ownership of the
-// requested path is enforced via ValidateStoragePathTenant either way.
+// the request context (set by whichever auth middleware precedes it). Tenant
+// ownership of the requested path is enforced via ValidateStoragePathTenant.
 func newFileServeHandler(
 	globalFileService interfaces.FileService,
 	storageResolver interfaces.StorageBackendResolver,
@@ -246,8 +236,7 @@ func serveFilesWithResources(
 	// API-key guard. A KB-restricted key is denied (a raw storage path cannot
 	// be bounded to its allow-list); full-access keys and tenant-wide retrieve
 	// keys pass, since the handler still enforces same-tenant paths
-	// (ValidateStoragePathTenant). Embed routes use their own
-	// /embed/.../files handler.
+	// (ValidateStoragePathTenant).
 	r.GET(
 		"/files",
 		middleware.AllowFileServeAPIKey(),
@@ -256,7 +245,7 @@ func serveFilesWithResources(
 }
 
 // serveResourceGrants exposes short, revocable capability URLs for clients
-// such as IM platforms that cannot attach a WeKnora bearer/embed token.
+// that cannot attach a WeKnora bearer token.
 func serveResourceGrants(
 	r *gin.Engine,
 	resourceCatalog interfaces.ResourceCatalog,
@@ -382,40 +371,6 @@ func newKBScopedFileServeHandlerWithResources(
 	}
 }
 
-// newMessageScopedFileServeHandler serves resources rendered inside one
-// assistant message. The message service first proves that the caller owns the
-// containing session, and the persisted message must reference the exact file.
-// For cross-workspace resources we then require either the
-// message's agent to still be shared from the resource-owning workspace, or —
-// when the reply was produced by the caller's own agent over an org-shared
-// knowledge base — that the resource's KB is still shared to the caller.
-//
-// The owner tenant comes from the resource registry whenever possible. This
-// also keeps old messages (written before agent_tenant_id was populated)
-// readable without accepting a client-provided source workspace ID.
-func newMessageScopedFileServeHandler(
-	messageService messageFileLookup,
-	agentShareService sharedAgentFileLookup,
-	tenantService interfaces.TenantService,
-	globalFileService interfaces.FileService,
-	storageResolver interfaces.StorageBackendResolver,
-	resourceCatalog interfaces.ResourceCatalog,
-	kbShareAuth messageKBShareAuthorizer,
-) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		reference, ok := requireFilePathQuery(c)
-		if !ok {
-			return
-		}
-		file, err := access.ResolveMessageFile(c.Request.Context(), c.Param("id"), c.Param("message_id"), reference,
-			messageService, agentShareService, resourceCatalog, kbShareAuth)
-		if fileAccessError(c, err) {
-			return
-		}
-		serveAuthorizedFile(c, file, tenantService, globalFileService, storageResolver, "message files")
-	}
-}
-
 // Storage consumes the authorized locator; it never infers permissions from
 // a context tenant or attempts a different resource after an authorization error.
 func serveAuthorizedFile(c *gin.Context, file access.FileAccess, tenants interfaces.TenantService,
@@ -479,58 +434,15 @@ func fileAccessError(c *gin.Context, err error) bool {
 	return true
 }
 
-// serveMessageScopedFiles registers the authenticated proxy used by the chat
-// renderer for assistant-message resources. The chat API-key capability is
-// sufficient because GetMessage enforces ownership of the API key's session.
-func serveMessageScopedFiles(
-	r *gin.RouterGroup,
-	g *rbacGuards,
-	messageService interfaces.MessageService,
-	agentShareService interfaces.AgentShareService,
-	tenantService interfaces.TenantService,
-	globalFileService interfaces.FileService,
-	storageResolver interfaces.StorageBackendResolver,
-	resourceCatalog interfaces.ResourceCatalog,
-	kbShareService interfaces.KBShareService,
-	kbService interfaces.KnowledgeBaseService,
-	knowledgeService interfaces.KnowledgeService,
-) {
-	g.apiKeyRoute(
-		r,
-		http.MethodGet,
-		"/sessions/:id/messages/:message_id/files",
-		apiKeyChat(apiKeyFullAccess()),
-		g.Viewer(),
-		newMessageScopedFileServeHandler(
-			messageService,
-			agentShareService,
-			tenantService,
-			globalFileService,
-			storageResolver,
-			resourceCatalog,
-			messageKBShareAuthorizer{
-				ShareGuard: kbShareService,
-				KBs:        kbService,
-				Knowledges: knowledgeService,
-			},
-		),
-	)
-}
-
 // servePresignedFiles serves files via HMAC-signed URLs without requiring authentication.
-// This is used by IM channels to serve images that are embedded in bot replies.
 //
 // Routes:
 //   - GET  /api/v1/files/presigned?file_path=<provider://...>&tenant_id=<id>&expires=<unix>&sig=<hmac>
-//   - HEAD /api/v1/files/presigned?...  (IM platforms issue HEAD first to validate
-//     Content-Type / Content-Length before rendering image previews; HEAD must
-//     succeed or the inline image renders as broken)
+//   - HEAD /api/v1/files/presigned?...  (HEAD must succeed or inline image
+//     previews render as broken)
 //
 // Failure paths log client IP + User-Agent + (truncated) file_path so operators
-// can correlate an IM platform's fetch against the upstream signing log line.
-// Without this it is otherwise impossible to tell whether a "broken image" is
-// caused by an expired signature, a stale URL cached by the platform, the
-// platform's IP being blocked, or the URL simply never reaching us.
+// can correlate a platform's fetch against the upstream signing log line.
 func servePresignedFiles(r *gin.Engine, tenantService interfaces.TenantService, storageResolver interfaces.StorageBackendResolver) {
 	handler := presignedFileHandler(tenantService, localStorageAbsDir(), storageResolver)
 	r.GET("/api/v1/files/presigned", handler)
@@ -539,8 +451,7 @@ func servePresignedFiles(r *gin.Engine, tenantService interfaces.TenantService, 
 
 // presignedFileHandler returns the shared Gin handler used by both GET and HEAD.
 // For HEAD requests it returns the same status + headers but does not stream
-// the body — this is enough for IM platforms to validate the URL while saving
-// us a full read of the backing object.
+// the body.
 func presignedFileHandler(tenantService interfaces.TenantService, absDir string, resolvers ...interfaces.StorageBackendResolver) gin.HandlerFunc {
 	var storageResolver interfaces.StorageBackendResolver
 	if len(resolvers) > 0 {
@@ -557,7 +468,7 @@ func presignedFileHandler(tenantService interfaces.TenantService, absDir string,
 		sig := strings.TrimSpace(c.Query("sig"))
 
 		if filePath == "" || tenantIDStr == "" || expiresStr == "" || sig == "" {
-			logger.Warnf(ctx, "[Router] /files/presigned missing params: client_ip=%s ua=%q file_path=%q tenant_id=%q expires=%q has_sig=%v",
+			logger.Warnf(ctx, "[Router] /files/presigned missing params: client_ip=%s ua=%q file_path=%q tenant_id=%q expires=%s has_sig=%v",
 				clientIP, userAgent, filePath, tenantIDStr, expiresStr, sig != "")
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing required parameters"})
 			return
@@ -570,15 +481,15 @@ func presignedFileHandler(tenantService interfaces.TenantService, absDir string,
 
 		tenantID, err := strconv.ParseUint(tenantIDStr, 10, 64)
 		if err != nil {
-			logger.Warnf(ctx, "[Router] /files/presigned invalid tenant_id: client_ip=%s tenant_id=%q err=%v", clientIP, tenantIDStr, err)
+			logger.Warnf(ctx, "[Router] /files/presigned invalid tenant_id: client_ip=%s tenant_id=%q err=%v", clientIP, tenantIDStr)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid tenant_id"})
 			return
 		}
 
 		// Verify HMAC signature and expiry. Logged at Warn because every 403
 		// here is a signal worth investigating: either the URL was tampered
-		// with, the IM platform cached an expired URL, or SYSTEM_AES_KEY was
-		// rotated without invalidating in-flight links.
+		// with, a platform cached an expired URL, or SYSTEM_AES_KEY
+		// was rotated without invalidating in-flight links.
 		if !secutils.VerifyFileURLSig(filePath, tenantID, expiresStr, sig) {
 			logger.Warnf(ctx, "[Router] /files/presigned sig invalid or expired: client_ip=%s ua=%q tenant_id=%d file_path=%q expires=%s",
 				clientIP, userAgent, tenantID, filePath, expiresStr)
@@ -598,7 +509,7 @@ func presignedFileHandler(tenantService interfaces.TenantService, absDir string,
 		if err != nil {
 			logger.Warnf(ctx, "[Router] /files/presigned resolve file service failed: client_ip=%s tenant_id=%d provider=%s err=%v",
 				clientIP, tenantID, provider, err)
-			c.Status(http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -622,10 +533,8 @@ func presignedFileHandler(tenantService interfaces.TenantService, absDir string,
 
 // servePresignedPreview registers an Admin-only diagnostic endpoint that
 // returns the presigned HTTP URL that *would be* generated for a given
-// storage path by the calling tenant's current storage config — exactly the
-// URL an IM channel would embed in a reply. Operators can paste the result
-// into a 4G/mobile browser to verify public reachability without having to
-// send a real message through an IM bot.
+// storage path by the calling tenant's current storage config. Operators can
+// paste the result into a 4G/mobile browser to verify public reachability.
 //
 // The path must belong to the calling tenant, exactly as on /files: signing
 // is a read, and an unconfined signer would turn any known resource handle or

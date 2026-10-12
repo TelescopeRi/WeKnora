@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -101,7 +100,7 @@ func TestPageRewriteContinuesWhenProviderHitsCompletionBudget(t *testing.T) {
 	service := &wikiIngestService{}
 
 	result, err := service.generateWithTemplateResult(
-		context.Background(), model, agent.WikiPageModifyUserPrompt, modifyTemplateData())
+		context.Background(), model, WikiPageModifyUserPrompt, modifyTemplateData())
 	if err != nil {
 		t.Fatalf("generateWithTemplateResult() error = %v", err)
 	}
@@ -129,7 +128,7 @@ func TestPageRewriteContinuesWhenProviderHitsCompletionBudget(t *testing.T) {
 	if second[2].Role != "assistant" || second[2].Content != certLedgerBlock(1, 61) {
 		t.Fatal("continuation request did not replay the partial page as an assistant turn")
 	}
-	if second[3].Role != "user" || second[3].Content != agent.WikiPageModifyContinuationPrompt {
+	if second[3].Role != "user" || second[3].Content != WikiPageModifyContinuationPrompt {
 		t.Fatalf("continuation request missing the continuation instruction: %q", second[3].Content)
 	}
 	// The evidence block must survive: the tail is written from the same source
@@ -153,7 +152,7 @@ func TestPageRewriteStopsAtContinuationCap(t *testing.T) {
 	service := &wikiIngestService{}
 
 	_, err := service.generateWithTemplateResult(
-		context.Background(), model, agent.WikiPageModifyUserPrompt, modifyTemplateData())
+		context.Background(), model, WikiPageModifyUserPrompt, modifyTemplateData())
 	if !errors.Is(err, errWikiPageRewriteTruncated) {
 		t.Fatalf("error = %v, want errWikiPageRewriteTruncated", err)
 	}
@@ -172,7 +171,7 @@ func TestPageRewriteAcceptsCompletePageUnchanged(t *testing.T) {
 	service := &wikiIngestService{}
 
 	result, err := service.generateWithTemplateResult(
-		context.Background(), model, agent.WikiPageModifyUserPrompt, modifyTemplateData())
+		context.Background(), model, WikiPageModifyUserPrompt, modifyTemplateData())
 	if err != nil {
 		t.Fatalf("generateWithTemplateResult() error = %v", err)
 	}
@@ -217,7 +216,7 @@ func TestPageRewriteContinuationDoneSentinel(t *testing.T) {
 	service := &wikiIngestService{}
 
 	result, err := service.generateWithTemplateResult(
-		context.Background(), model, agent.WikiPageModifyUserPrompt, modifyTemplateData())
+		context.Background(), model, WikiPageModifyUserPrompt, modifyTemplateData())
 	if err != nil {
 		t.Fatalf("generateWithTemplateResult() error = %v", err)
 	}

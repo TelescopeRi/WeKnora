@@ -5,7 +5,6 @@ import {
   MODEL_IN_USE_ERROR_CODE,
   ModelInUseError,
   modelInUseErrorFromRequest,
-  modelUsageAgentSection,
   modelUsageBindingI18nKey,
   modelUsageKnowledgeBaseSection,
   modelUsageListTruncated,
@@ -98,18 +97,6 @@ test('keeps navigation and localization stable for all resource kinds', () => {
     modelUsageResourceRoute('knowledge_base', 'kb/with slash'),
     { path: '/platform/knowledge-bases/kb%2Fwith%20slash' },
   )
-  assert.deepEqual(
-    modelUsageResourceRoute('agent', 'agent-1'),
-    { path: '/platform/agents', query: { edit: 'agent-1', section: 'model' } },
-  )
-  assert.deepEqual(
-    modelUsageResourceRoute('agent', 'agent-1', ['vlm_model']),
-    { path: '/platform/agents', query: { edit: 'agent-1', section: 'multimodal' } },
-  )
-  assert.deepEqual(
-    modelUsageResourceRoute('agent', 'agent-1', ['follow_up_model']),
-    { path: '/platform/agents', query: { edit: 'agent-1', section: 'suggestions' } },
-  )
   assert.equal(modelUsageBindingI18nKey('vlm_model'), 'modelSettings.usage.bindings.vlm_model')
   assert.equal(modelUsageBindingI18nKey('future_binding'), 'modelSettings.usage.bindings.unknown')
 })
@@ -124,16 +111,4 @@ test('maps knowledge-base bindings to the configuration section that owns them',
   assert.equal(modelUsageKnowledgeBaseSection(['asr_model']), 'asr')
   assert.equal(modelUsageKnowledgeBaseSection(['future_binding']), 'models')
   assert.equal(modelUsageKnowledgeBaseSection(['summary_model', 'vlm_model']), 'models')
-})
-
-test('maps agent bindings to the configuration section that owns them', () => {
-  assert.equal(modelUsageAgentSection(['chat_model']), 'model')
-  assert.equal(modelUsageAgentSection(['rerank_model']), 'model')
-  assert.equal(modelUsageAgentSection(['query_understand_model']), 'model')
-  assert.equal(modelUsageAgentSection(['vlm_model']), 'multimodal')
-  assert.equal(modelUsageAgentSection(['asr_model']), 'multimodal')
-  assert.equal(modelUsageAgentSection(['follow_up_model']), 'suggestions')
-  assert.equal(modelUsageAgentSection(['future_binding']), 'model')
-  assert.equal(modelUsageAgentSection(['chat_model', 'vlm_model']), 'model')
-  assert.equal(modelUsageAgentSection(['vlm_model', 'follow_up_model']), 'multimodal')
 })

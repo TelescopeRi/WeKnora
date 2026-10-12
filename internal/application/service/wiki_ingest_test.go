@@ -13,7 +13,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/types"
 )
@@ -397,7 +396,7 @@ func TestGenerateWikiPageModifyUsesCacheableMessageLayout(t *testing.T) {
 	model := &templateCaptureChatModel{response: "SUMMARY: page\n# Alpha"}
 	service := &wikiIngestService{}
 	ctx := context.WithValue(context.Background(), types.TenantIDContextKey, uint64(7))
-	_, err := service.generateWithTemplate(ctx, model, agent.WikiPageModifyUserPrompt, map[string]string{
+	_, err := service.generateWithTemplate(ctx, model, WikiPageModifyUserPrompt, map[string]string{
 		"HasAdditions":         "1",
 		"SharedSourceContexts": "<document><context>shared source summary</context></document>\n",
 		"PageSlug":             "concept/alpha",

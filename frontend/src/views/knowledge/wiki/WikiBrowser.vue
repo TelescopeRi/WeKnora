@@ -422,11 +422,6 @@
                                 })
                                 }}</span>
                               </div>
-                              <t-button v-if="props.canEdit" size="small" theme="primary" variant="base"
-                                @click="triggerAutoFix">
-                                <template #icon><t-icon name="tools" /></template>
-                                {{ $t('knowledgeEditor.wikiBrowser.issueFixBtn') }}
-                              </t-button>
                             </div>
                             <div class="wiki-issue-popup-list">
                               <div v-for="issue in pageIssues" :key="issue.id" class="wiki-issue-popup-item">
@@ -457,11 +452,6 @@
                                         }) }}
                                     </span>
                                     <div v-if="props.canEdit" class="wiki-issue-popup-actions">
-                                      <span class="wiki-issue-popup-action" @click="triggerFixIssue(issue)"
-                                        style="margin-right: 12px; font-weight: 500;">
-                                        <t-icon name="tools" style="margin-right: 4px;" />{{
-                                          $t('knowledgeEditor.wikiBrowser.issueFixSingle') }}
-                                      </span>
                                       <span class="wiki-issue-popup-action"
                                         style="color: var(--td-text-color-placeholder);"
                                         @click="handleIssueIgnore(issue.id)">{{
@@ -718,13 +708,6 @@
       </div>
     </t-drawer>
 
-    <!-- Fix Chat Drawer -->
-    <t-drawer v-model:visible="showFixDrawer" :header="$t('knowledgeEditor.wikiBrowser.fixAssistantTitle')" size="700px"
-      :footer="false" class="wiki-fix-drawer">
-      <ChatView v-if="showFixDrawer" :session_id="currentFixSessionId" agentId="builtin-wiki-fixer"
-        :kbIds="[props.knowledgeBaseId]" :embeddedMode="true" />
-    </t-drawer>
-
     <!-- Revision history drawer -->
     <WikiRevisionDrawer v-model:visible="showRevisionDrawer" :kb-id="props.knowledgeBaseId"
       :slug="selectedPage?.slug || ''" :current-page="selectedPage" :can-edit="props.canEdit"
@@ -793,8 +776,6 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useMenuStore } from '@/stores/menu'
-import { useSettingsStore } from '@/stores/settings'
 import { useI18n } from 'vue-i18n'
 import { marked } from 'marked'
 import { MessagePlugin } from 'tdesign-vue-next'
@@ -809,8 +790,6 @@ import {
   expandWikiDirectoryPath,
 } from './wikiDirectoryState'
 import { getKnowledgeDetails } from '@/api/knowledge-base'
-import { createSessions } from '@/api/chat'
-import ChatView from '@/views/chat/index.vue'
 import {
   listWikiPages,
   listWikiFolders,
@@ -839,8 +818,6 @@ import {
 
 const router = useRouter()
 const route = useRoute()
-const menuStore = useMenuStore()
-const settingsStore = useSettingsStore()
 
 const { t } = useI18n()
 
@@ -978,10 +955,8 @@ const activeSystemView = ref<'' | 'index'>('')
 const searchResults = ref<WikiPage[] | null>(null)
 const pageIssues = ref<WikiPageIssue[]>([])
 const showIssuesBox = ref(false)
-const showFixDrawer = ref(false)
 const showGlobalIssuesDrawer = ref(false)
 const globalIssues = ref<WikiPageIssue[]>([])
-const currentFixSessionId = ref('')
 const stats = ref<WikiStats | null>(null)
 const graphData = ref<WikiGraphData | null>(null)
 const searchQuery = ref('')
@@ -3600,58 +3575,6 @@ async function handleIssueIgnore(issueId: string) {
   } catch (e) {
     console.error('Failed to update issue status:', e)
   }
-}
-
-async function startFixSession(prompt: string) {
-  try {
-    const res = await createSessions({})
-    if (res && (res as any).data && (res as any).data.id) {
-      const sessionId = (res as any).data.id
-      const now = new Date().toISOString()
-
-      menuStore.updataMenuChildren({
-        title: t('knowledgeEditor.wikiBrowser.fixAssistantTitle'),
-        path: `chat/${sessionId}`,
-        id: sessionId,
-        isMore: false,
-        isNoTitle: true,
-        created_at: now,
-        updated_at: now
-      })
-
-      menuStore.changeIsFirstSession(true)
-      menuStore.changeFirstQuery(prompt, [], '', [])
-
-      currentFixSessionId.value = sessionId
-      showFixDrawer.value = true
-      showIssuesBox.value = false // Hide issues box
-    } else {
-      MessagePlugin.error(t('knowledgeEditor.wikiBrowser.fixStartError'))
-    }
-  } catch (e) {
-    console.error('Failed to create fix session', e)
-    MessagePlugin.error(t('knowledgeEditor.wikiBrowser.fixStartError'))
-  }
-}
-
-function triggerFixIssue(issue: WikiPageIssue) {
-  if (!selectedPage.value) return
-  const prompt = t('knowledgeEditor.wikiBrowser.issueFixPromptSingle', {
-    slug: selectedPage.value.slug,
-    id: issue.id
-  })
-  startFixSession(prompt)
-}
-
-function triggerAutoFix() {
-  if (!selectedPage.value || pageIssues.value.length === 0) return
-  let prompt = t('knowledgeEditor.wikiBrowser.issueFixPromptAutoStart', { slug: selectedPage.value.slug }) + '\n\n'
-
-  pageIssues.value.forEach((issue, idx) => {
-    prompt += `${idx + 1}. Issue ID: ${issue.id}\n`
-  })
-
-  startFixSession(prompt)
 }
 
 async function doSearch() {

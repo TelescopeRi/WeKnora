@@ -1,7 +1,5 @@
 package service
 
-import "github.com/Tencent/WeKnora/internal/modelcontext"
-
 // wikiSlugHandles maps real wiki slugs to short, low-entropy model handles
 // (ref-1, ref-2, …) so the ingest editor LLM never has to reproduce a
 // high-entropy slug verbatim — most importantly the UUID-based summary slugs
@@ -15,14 +13,14 @@ import "github.com/Tencent/WeKnora/internal/modelcontext"
 // (c000/c001) indirection already used by the chunk-citation pass in
 // wiki_ingest_cite.go.
 //
-// Handle allocation and reverse lookup are owned by modelcontext.HandleTable;
+// Handle allocation and reverse lookup are owned by HandleTable;
 // this wrapper contains only the Wiki-link rewrite semantics.
 type wikiSlugHandles struct {
-	table *modelcontext.HandleTable
+	table *HandleTable
 }
 
 func newWikiSlugHandles() *wikiSlugHandles {
-	return &wikiSlugHandles{table: modelcontext.NewHandleTable("ref-", 0, 1)}
+	return &wikiSlugHandles{table: NewHandleTable("ref-", 0, 1)}
 }
 
 // handle returns the stable handle for a real slug, assigning a fresh one on

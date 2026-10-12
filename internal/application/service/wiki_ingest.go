@@ -13,7 +13,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/searchutil"
@@ -2297,7 +2296,7 @@ func (s *wikiIngestService) rebuildIndexPage(ctx context.Context, chatModel chat
 		if docSummaries.Len() == 0 {
 			docSummaries.WriteString("(no documents yet)")
 		}
-		generatedIntro, genErr := s.generateWithTemplate(ctx, chatModel, agent.WikiIndexIntroPrompt, map[string]string{
+		generatedIntro, genErr := s.generateWithTemplate(ctx, chatModel, WikiIndexIntroPrompt, map[string]string{
 			"DocumentSummaries":  framing + docSummaries.String(),
 			"Language":           lang,
 			"CustomInstructions": customInstructions,
@@ -2315,7 +2314,7 @@ func (s *wikiIngestService) rebuildIndexPage(ctx context.Context, chatModel chat
 		// would re-flood the context every batch, and the
 		// change-description block already encodes the "what just
 		// changed" signal the prompt is asking for.
-		updatedIntro, genErr := s.generateWithTemplate(ctx, chatModel, agent.WikiIndexIntroUpdatePrompt, map[string]string{
+		updatedIntro, genErr := s.generateWithTemplate(ctx, chatModel, WikiIndexIntroUpdatePrompt, map[string]string{
 			"ExistingIntro":      existingIntro,
 			"ChangeDescription":  changeDesc,
 			"DocumentSummaries":  "",
@@ -2590,7 +2589,7 @@ func (s *wikiIngestService) deduplicateExtractedBatch(
 		return stabilize()
 	}
 
-	dedupeJSON, err := s.generateWithTemplate(ctx, chatModel, agent.WikiDeduplicationPrompt, map[string]string{
+	dedupeJSON, err := s.generateWithTemplate(ctx, chatModel, WikiDeduplicationPrompt, map[string]string{
 		"Candidates": candBuf.String(),
 	})
 	if err != nil {
@@ -2725,9 +2724,9 @@ func (s *wikiIngestService) generateWithTemplateResult(
 	prompt := buf.String()
 	purpose := wikiPromptPurpose(promptTpl)
 	messages := []chat.Message{{Role: "user", Content: prompt}}
-	if promptTpl == agent.WikiPageModifyUserPrompt {
+	if promptTpl == WikiPageModifyUserPrompt {
 		systemPrompt := types.AppendCustomPromptInstructions(
-			agent.WikiPageModifySystemPrompt,
+			WikiPageModifySystemPrompt,
 			maskedData["CustomInstructions"],
 			maskedData["InstructionScope"],
 		)
@@ -2744,7 +2743,7 @@ func (s *wikiIngestService) generateWithTemplateResult(
 	opts := &chat.ChatOptions{Temperature: 0.3, Thinking: &thinking, MaxTokens: wikiLLMMaxTokens}
 	prefixFingerprint := chat.PromptPrefixFingerprint(messages, opts)
 	warmupKey := ""
-	if promptTpl == agent.WikiPageModifyUserPrompt {
+	if promptTpl == WikiPageModifyUserPrompt {
 		prefixFingerprint = chat.FingerprintPromptPrefix(
 			messages[0].Content, maskedData["SharedSourceContexts"],
 		)
@@ -2768,7 +2767,7 @@ func (s *wikiIngestService) generateWithTemplateResult(
 
 	execute := func() (interface{}, error) {
 		releaseWarmup := func() {}
-		if tenantScoped && promptTpl == agent.WikiPageModifyUserPrompt && strings.TrimSpace(maskedData["SharedSourceContexts"]) != "" {
+		if tenantScoped && promptTpl == WikiPageModifyUserPrompt && strings.TrimSpace(maskedData["SharedSourceContexts"]) != "" {
 			var warmupErr error
 			releaseWarmup, warmupErr = s.awaitWikiPromptWarmup(ctx, warmupKey)
 			if warmupErr != nil {
@@ -2818,7 +2817,7 @@ func (s *wikiIngestService) generateWithTemplateResult(
 		// stops at the completion budget, replay the fragment as an assistant
 		// turn and ask for the tail. Everything else keeps the single-call
 		// behaviour (a truncated JSON extraction already fails its parse).
-		canContinue := promptTpl == agent.WikiPageModifyUserPrompt
+		canContinue := promptTpl == WikiPageModifyUserPrompt
 
 		var (
 			rewrite      strings.Builder
@@ -2853,7 +2852,7 @@ func (s *wikiIngestService) generateWithTemplateResult(
 			conversation = append(
 				append([]chat.Message(nil), conversation...),
 				chat.Message{Role: "assistant", Content: response.Content},
-				chat.Message{Role: "user", Content: agent.WikiPageModifyContinuationPrompt},
+				chat.Message{Role: "user", Content: WikiPageModifyContinuationPrompt},
 			)
 		}
 
@@ -2903,21 +2902,21 @@ func (s *wikiIngestService) generateWithTemplateResult(
 
 func wikiPromptPurpose(promptTpl string) string {
 	switch promptTpl {
-	case agent.WikiPageModifyUserPrompt:
+	case WikiPageModifyUserPrompt:
 		return "wiki_page_modify"
-	case agent.WikiChunkCitationPrompt:
+	case WikiChunkCitationPrompt:
 		return "wiki_chunk_citation"
-	case agent.WikiCandidateSlugPrompt:
+	case WikiCandidateSlugPrompt:
 		return "wiki_candidate_slug"
-	case agent.WikiSummaryPrompt:
+	case WikiSummaryPrompt:
 		return "wiki_summary"
-	case agent.WikiKnowledgeExtractPrompt:
+	case WikiKnowledgeExtractPrompt:
 		return "wiki_knowledge_extract"
-	case agent.WikiTaxonomyPlanPrompt:
+	case WikiTaxonomyPlanPrompt:
 		return "wiki_taxonomy_plan"
-	case agent.WikiDeduplicationPrompt:
+	case WikiDeduplicationPrompt:
 		return "wiki_deduplication"
-	case agent.WikiIndexIntroPrompt, agent.WikiIndexIntroUpdatePrompt:
+	case WikiIndexIntroPrompt, WikiIndexIntroUpdatePrompt:
 		return "wiki_index_intro"
 	default:
 		return "wiki_generation"

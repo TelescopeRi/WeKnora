@@ -67,8 +67,8 @@ test('skill ZIP drops on settings never enter knowledge upload or consume the lo
   }
 })
 
-test('settings opened over a knowledge base or chat own their file drops', async () => {
-  for (const name of ['knowledgeBaseDetail', 'chat', 'globalCreatChat', 'kbCreatChat']) {
+test('settings opened over a knowledge base own their file drops', async () => {
+  for (const name of ['knowledgeBaseDetail']) {
     const f = fixture(name, { kbId: 'kb-1', settingsOpen: true })
     const event = fileDrag()
     f.handleGlobalDragEnter(event)
@@ -83,7 +83,7 @@ test('settings opened over a knowledge base or chat own their file drops', async
 })
 
 test('unrelated pages and a knowledge route without an ID ignore global upload', async () => {
-  for (const name of ['knowledgeBaseList', 'agentList', 'organizationList', 'knowledgeBaseDetail']) {
+  for (const name of ['knowledgeBaseList', 'settings', 'organizationList', 'knowledgeBaseDetail']) {
     const f = fixture(name)
     f.handleGlobalDragEnter(fileDrag())
     await f.handleGlobalDrop(fileDrag())
@@ -106,18 +106,6 @@ test('knowledge file drops still validate initialization and reach the knowledge
   assert.equal(f.dispatched[0].detail.files, event.dataTransfer.files)
 })
 
-test('chat file drops still dispatch attachments without knowledge initialization', async () => {
-  for (const name of ['chat', 'globalCreatChat', 'kbCreatChat']) {
-    const f = fixture(name, { kbId: 'kb-1' })
-    const event = fileDrag()
-    await f.handleGlobalDrop(event)
-    assert.deepEqual(f.requests, [])
-    assert.deepEqual(f.messages, [])
-    assert.equal(f.dispatched[0].type, 'weknora:chat-file-drop')
-    assert.equal(f.dispatched[0].detail.files, event.dataTransfer.files)
-  }
-})
-
 test('in-app text drags do not activate upload', async () => {
   const f = fixture('knowledgeBaseDetail', { kbId: 'kb-1' })
   const event = fileDrag(['text/plain'])
@@ -129,7 +117,7 @@ test('in-app text drags do not activate upload', async () => {
 })
 
 test('opening settings during a drag clears the global upload mask', async () => {
-  const f = fixture('chat')
+  const f = fixture('knowledgeBaseDetail', { kbId: 'kb-1' })
   f.handleGlobalDragEnter(fileDrag())
   assert.equal(f.ismask.value, true)
   f.uiStore.showSettingsModal = true

@@ -45,56 +45,6 @@ func RegisterModelRoutes(
 	}
 }
 
-// Sandbox configs are workspace infrastructure that hold provider credentials.
-// Scoped API keys cannot safely receive partial authority over them yet because
-// mutation can strand remote sandboxes.
-func RegisterSandboxConfigRoutes(
-	r *gin.RouterGroup,
-	h *handler.SandboxConfigHandler,
-	skills *handler.SandboxSkillHandler,
-	g *rbacGuards,
-) {
-	configs := g.apiKeyGroup(r.Group("/sandbox-configs"), apiKeyFullAccess())
-	{
-		configs.GET("", g.Viewer(), h.List)
-		configs.PUT("/workspace-policy", g.Admin(), h.SetWorkspacePolicy)
-		configs.POST("/templates/query", g.Admin(), h.QueryTemplates)
-		configs.POST("", g.Admin(), h.Create)
-		configs.GET("/:id", g.Viewer(), h.Get)
-		configs.PUT("/:id", g.Admin(), h.Update)
-		configs.DELETE("/:id", g.Admin(), h.Delete)
-		configs.GET("/:id/sandboxes", g.Admin(), h.Inventory)
-		// Skills are Admin+ throughout, reads included: an upload drives a
-		// root shell whose output is baked into the image every session of
-		// this config boots, and the listing names what that image carries.
-		configs.GET("/:id/skills", g.Admin(), skills.List)
-		configs.POST("/:id/skills", g.Admin(), skills.Upload)
-		configs.GET("/:id/skills/:skillId", g.Admin(), skills.Get)
-		configs.GET("/:id/skills/:skillId/files", g.Admin(), skills.ListFiles)
-		configs.GET("/:id/skills/:skillId/files/content", g.Admin(), skills.GetFile)
-		configs.POST("/:id/skills/:skillId/reinstall", g.Admin(), skills.Reinstall)
-		configs.GET("/:id/skills/:skillId/guidance", g.Admin(), skills.InstallGuidance)
-		configs.POST("/:id/skills/:skillId/guidance", g.Admin(), skills.SteerInstall)
-		configs.POST("/:id/skills/:skillId/stop", g.Admin(), skills.Stop)
-		configs.PATCH("/:id/skills/:skillId", g.Admin(), skills.Patch)
-		configs.DELETE("/:id/skills/:skillId", g.Admin(), skills.Delete)
-		configs.GET("/:id/skills/:skillId/install-events", g.Admin(), skills.InstallEvents)
-		configs.GET("/:id/skills/:skillId/transcript", g.Admin(), skills.InstallTranscript)
-	}
-}
-
-// RegisterEvaluationRoutes registers evaluation endpoints. Running an
-// evaluation drives LLM calls (cost) and reads from KBs across the
-// tenant; gate to Admin+ until product asks for a finer-grained
-// matrix.
-func RegisterEvaluationRoutes(r *gin.RouterGroup, handler *handler.EvaluationHandler, g *rbacGuards) {
-	evaluationRoutes := g.apiKeyGroup(r.Group("/evaluation"), apiKeyRunEvaluations(apiKeyFullAccess()))
-	{
-		evaluationRoutes.POST("", g.Admin(), handler.Evaluation)
-		evaluationRoutes.GET("", g.Viewer(), handler.GetEvaluationResult)
-	}
-}
-
 func RegisterInitializationRoutes(r *gin.RouterGroup, handler *handler.InitializationHandler, g *rbacGuards) {
 	// 初始化接口
 	// GetCurrentConfigByKB 是只读，Viewer+ 即可（KB 受限 key 可读其范围内的 KB）。
@@ -133,9 +83,7 @@ func RegisterInitializationRoutes(r *gin.RouterGroup, handler *handler.Initializ
 // RegisterMCPServiceRoutes registers MCP service routes.
 //
 // MCP services are tenant-level integrations (external tool servers); we
-// gate reads to Viewer+ and any mutation/test to Admin+. Tool-approval
-// resolution is also Admin+ since approving a pending tool call grants
-// the agent permission to execute side-effecting external commands.
+// gate reads to Viewer+ and any mutation/test to Admin+.
 // Credential subresource writes are Admin+ as well since secrets are
 // tenant-scoped.
 func RegisterMCPServiceRoutes(
@@ -179,31 +127,12 @@ func RegisterMCPServiceRoutes(
 		// PUT body. See internal/handler/mcp_credentials.go for the contract. — Admin+
 		mcpServices.PUT("/:id/credentials", g.Admin(), credHandler.Put)
 		mcpServices.DELETE("/:id/credentials/:field", g.Admin(), credHandler.DeleteField)
-		// MCP tool human approval (issue #1173) — Viewer+ to read, Admin+ to set policy
-		mcpServices.GET("/:id/tool-approvals", g.Viewer(), handler.ListMCPToolApprovals)
-		mcpServices.PUT("/:id/tool-approvals/:tool_name", g.Admin(), handler.SetMCPToolApproval)
 		// Per-user OAuth authorization flow. Viewer+ may authorize/inspect/
 		// revoke their own token; the callback is the separate public route
 		// registered above.
 		mcpServices.POST("/:id/oauth/authorize-url", g.Viewer(), oauthHandler.AuthorizeURL)
 		mcpServices.GET("/:id/oauth/status", g.Viewer(), oauthHandler.Status)
 		mcpServices.DELETE("/:id/oauth/token", g.Viewer(), oauthHandler.Revoke)
-	}
-
-	// /agent tool-approval + OAuth resolution are interactive human flows;
-	// not declared for API keys (default-deny).
-	agentTool := r.Group("/agent")
-	{
-		// Resolving a pending tool-approval is gated to tenant members
-		// (Viewer+). The approval card surfaces inside an agent chat the
-		// caller initiated — restricting it to Admin+ blocks the only
-		// people who actually have context to approve, so the gate is
-		// kept at "anyone in the tenant" instead.
-		agentTool.POST("/tool-approvals/:pending_id", g.Viewer(), handler.ResolveToolApproval)
-		// Resume an agent run paused on an in-conversation MCP OAuth prompt.
-		// Same tenant-member (Viewer+) gating rationale as tool-approvals.
-		agentTool.POST("/mcp-oauth-resolutions/:pending_id", g.Viewer(), oauthHandler.ResolveMCPOAuth)
-		agentTool.POST("/mcp-oauth-resolutions/:pending_id/cancel", g.Viewer(), oauthHandler.CancelMCPOAuth)
 	}
 }
 

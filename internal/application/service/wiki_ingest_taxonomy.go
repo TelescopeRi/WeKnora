@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/Tencent/WeKnora/internal/agent"
 	"github.com/Tencent/WeKnora/internal/logger"
 	"github.com/Tencent/WeKnora/internal/models/chat"
 	"github.com/Tencent/WeKnora/internal/types"
@@ -80,7 +79,7 @@ func (s *wikiIngestService) planBatchTaxonomy(
 				it.slug, it.title, it.pageType, previewText(it.about, 120))
 		}
 
-		raw, err := s.generateWithTemplate(ctx, chatModel, agent.WikiTaxonomyPlanPrompt, map[string]string{
+		raw, err := s.generateWithTemplate(ctx, chatModel, WikiTaxonomyPlanPrompt, map[string]string{
 			"ExistingTaxonomy": tree,
 			"Items":            itemsBlock.String(),
 			"Language":         lang,

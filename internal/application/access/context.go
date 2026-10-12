@@ -16,23 +16,6 @@ type kbGrant struct {
 	task       bool
 }
 
-type agentGrant struct {
-	caller types.Caller
-	scope  types.SharedAgentKBScope
-}
-
-// WithSharedAgent scopes execution after the caller has authorized this exact
-// agent. Only its configured KBs receive read access; other source-tenant KBs
-// and the source tenant's organization memberships are not inherited.
-func WithSharedAgent(ctx context.Context, agent *types.CustomAgent) context.Context {
-	grant := agentGrant{caller: types.CallerFromContext(ctx), scope: types.NewSharedAgentKBScope(agent)}
-	ctx = context.WithValue(ctx, types.SharedAgentGrantContextKey, grant)
-	if agent == nil {
-		return ctx
-	}
-	return types.WithExecutionTenant(ctx, agent.TenantID)
-}
-
 // HasKBGrant checks only previously resolved resource access. It never infers
 // ownership from the execution tenant, and always reapplies API-key scope.
 func HasKBGrant(ctx context.Context, kbID string, tenantID uint64, required types.OrgMemberRole) bool {
@@ -51,9 +34,7 @@ func HasKBGrant(ctx context.Context, kbID string, tenantID uint64, required type
 			return true
 		}
 	}
-	grant, ok := ctx.Value(types.SharedAgentGrantContextKey).(agentGrant)
-	return ok && caller.TenantID != 0 && required == types.OrgRoleViewer && grant.caller == caller &&
-		grant.scope.Allows(kbID, tenantID)
+	return false
 }
 
 // KBPermissions combines caller ownership, exact context grants and organization

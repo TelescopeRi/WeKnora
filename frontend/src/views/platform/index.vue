@@ -77,12 +77,6 @@ const getCurrentKbId = (): string | null => {
     return (route.params as any)?.kbId as string || null
 }
 
-const CHAT_DROP_ROUTE_NAMES = new Set(['chat', 'globalCreatChat', 'kbCreatChat']);
-
-const isChatDropRoute = () => {
-    return CHAT_DROP_ROUTE_NAMES.has(String(route.name || ''));
-}
-
 // 检查知识库初始化状态
 const checkKnowledgeBaseInitialization = async (): Promise<boolean> => {
     const currentKbId = getCurrentKbId();
@@ -130,9 +124,8 @@ const shouldHandleGlobalFileDrag = (event: DragEvent): boolean => {
     event.preventDefault();
     // Settings and its teleported skill drawers own their uploads. This runs
     // in document capture, before a local drop handler can stop propagation.
-    const enabled = !uiStore.showSettingsModal && (
-        isChatDropRoute() || (route.name === 'knowledgeBaseDetail' && !!getCurrentKbId())
-    );
+    const enabled = !uiStore.showSettingsModal &&
+        route.name === 'knowledgeBaseDetail' && !!getCurrentKbId();
     if (!enabled) {
         dragCounter = 0;
         ismask.value = false;
@@ -176,14 +169,6 @@ const handleGlobalDrop = async (event: DragEvent) => {
         return;
     }
 
-    if (isChatDropRoute()) {
-        event.stopPropagation();
-        window.dispatchEvent(new CustomEvent('weknora:chat-file-drop', {
-            detail: { files: droppedFiles }
-        }));
-        return;
-    }
-    
     const isInitialized = await checkKnowledgeBaseInitialization();
     if (!isInitialized) {
         return;
@@ -210,8 +195,8 @@ onMounted(() => {
     // 支持通过 URL 查询参数打开全局命令面板，例如旧路径
     // /platform/knowledge-search?q=foo 重定向后携带 ?cmdk=foo
     maybeOpenCmdkFromRoute()
-    // 后台预取对话输入栏资源，进入 creatChat / chat 时复用缓存
-    void useChatResourcesStore().prefetchChatInput()
+    // 后台预取平台公共资源（知识库列表、模型、联网搜索渠道等）
+    void useChatResourcesStore().prefetchPlatformResources()
 });
 
 // 监听路由变化，兼容 SPA 内部跳转时的 ?cmdk= 参数

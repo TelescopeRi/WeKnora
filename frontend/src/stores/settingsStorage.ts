@@ -1,5 +1,4 @@
-import { safeRemoveItem, safeSetItem } from "@/composables/preferenceStorage";
-import { reconcileBuiltinAgentMode } from "@/utils/agent-mode";
+import { safeRemoveItem } from "@/composables/preferenceStorage";
 
 export const SETTINGS_STORAGE_KEY = "WeKnora_settings";
 
@@ -15,29 +14,11 @@ export function isStoredSettingsRecord(
 }
 
 type ReconcilableSettings = {
-  selectedTags?: unknown;
-  selectedMCPServices?: unknown;
-  selectedSkills?: unknown;
-  selectedTools?: unknown;
-  selectedFileKbMap?: unknown;
-  enableMemory?: unknown;
-  isAgentEnabled: boolean;
-  selectedAgentId?: string;
+  selectedKnowledgeBases?: unknown;
 };
 
 function reconcileLoadedSettings<T extends ReconcilableSettings>(loaded: T): T {
-  loaded.selectedTags ||= [];
-  loaded.selectedMCPServices ||= [];
-  loaded.selectedSkills ||= (loaded.selectedTools as string[] | undefined) || [];
-  loaded.selectedFileKbMap ||= {};
-  const removedLegacyMemorySetting = Object.prototype.hasOwnProperty.call(loaded, "enableMemory");
-  if (removedLegacyMemorySetting) {
-    delete loaded.enableMemory;
-  }
-  const reconciledAgentMode = reconcileBuiltinAgentMode(loaded);
-  if (removedLegacyMemorySetting || reconciledAgentMode) {
-    safeSetItem(SETTINGS_STORAGE_KEY, JSON.stringify(loaded));
-  }
+  loaded.selectedKnowledgeBases ||= [];
   return loaded;
 }
 
@@ -53,7 +34,7 @@ function resetStoredSettings<T extends ReconcilableSettings>(
   return reconcileLoadedSettings(cloneSettings(defaultSettings));
 }
 
-/** Load settings from localStorage, reconcile builtin agent mode, fall back on corruption. */
+/** Load settings from localStorage, fall back to defaults on corruption. */
 export function loadAndReconcileSettings<T extends ReconcilableSettings>(
   defaultSettings: T,
 ): T {

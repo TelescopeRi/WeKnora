@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/Tencent/WeKnora/internal/application/repository"
-	chatpipeline "github.com/Tencent/WeKnora/internal/application/service/chat_pipeline"
+	"github.com/Tencent/WeKnora/internal/application/service"
 	"github.com/Tencent/WeKnora/internal/assets"
 	"github.com/Tencent/WeKnora/internal/config"
 	"github.com/Tencent/WeKnora/internal/errors"
@@ -2625,7 +2625,7 @@ func (h *InitializationHandler) extractRelationsFromText(
 		Examples:    h.config.ExtractManager.ExtractGraph.Examples,
 	}
 
-	extractor := chatpipeline.NewExtractor(chatModel, template)
+	extractor := service.NewExtractor(chatModel, template)
 	graph, err := extractor.Extract(ctx, text)
 	if err != nil {
 		logger.Error(ctx, "文本关系提取失败", err)

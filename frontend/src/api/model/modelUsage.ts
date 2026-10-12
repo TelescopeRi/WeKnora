@@ -124,11 +124,9 @@ export function modelUsageListTruncated(resources: readonly ModelUsageResource[]
   return modelUsageResourceCount(resources, total) > resources.length
 }
 
-export type ModelUsageResourceKind = 'knowledge_base' | 'agent'
+export type ModelUsageResourceKind = 'knowledge_base'
 
 export type KnowledgeBaseModelUsageSection = 'models' | 'multimodal' | 'asr'
-
-export type AgentModelUsageSection = 'model' | 'multimodal' | 'suggestions'
 
 const knowledgeBaseUsageSections: Partial<Record<KnownModelUsageBinding, KnowledgeBaseModelUsageSection>> = {
   embedding_model: 'models',
@@ -138,15 +136,6 @@ const knowledgeBaseUsageSections: Partial<Record<KnownModelUsageBinding, Knowled
   image_processing_model: 'multimodal',
   vlm_model: 'multimodal',
   asr_model: 'asr',
-}
-
-const agentUsageSections: Partial<Record<KnownModelUsageBinding, AgentModelUsageSection>> = {
-  chat_model: 'model',
-  rerank_model: 'model',
-  query_understand_model: 'model',
-  vlm_model: 'multimodal',
-  asr_model: 'multimodal',
-  follow_up_model: 'suggestions',
 }
 
 export function modelUsageKnowledgeBaseSection(
@@ -159,26 +148,9 @@ export function modelUsageKnowledgeBaseSection(
   return 'models'
 }
 
-export function modelUsageAgentSection(
-  bindings: readonly string[],
-): AgentModelUsageSection {
-  for (const binding of bindings) {
-    const section = agentUsageSections[binding as KnownModelUsageBinding]
-    if (section) return section
-  }
-  return 'model'
-}
-
 export function modelUsageResourceRoute(
   kind: ModelUsageResourceKind,
   id: string,
-  bindings: readonly string[] = [],
 ) {
-  if (kind === 'knowledge_base') {
-    return { path: `/platform/knowledge-bases/${encodeURIComponent(id)}` }
-  }
-  return {
-    path: '/platform/agents',
-    query: { edit: id, section: modelUsageAgentSection(bindings) },
-  }
+  return { path: `/platform/knowledge-bases/${encodeURIComponent(id)}` }
 }

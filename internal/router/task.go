@@ -45,8 +45,6 @@ type AsynqTaskParams struct {
 	KnowledgeAutoTag     interfaces.TaskHandler `name:"knowledgeAutoTag"`
 	KnowledgeBaseProfile interfaces.TaskHandler `name:"knowledgeBaseProfile"`
 	WikiIngest           interfaces.TaskHandler `name:"wikiIngest"`
-	TemporaryDocument    interfaces.TemporaryDocumentService
-	MemoryService        interfaces.MemoryService
 	DeadLetterRepo       interfaces.TaskDeadLetterRepository
 	SpanTracker          service.SpanTracker
 }
@@ -267,7 +265,6 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 
 	// Register document processing handler
 	mux.HandleFunc(types.TypeDocumentProcess, params.KnowledgeService.ProcessDocument)
-	mux.HandleFunc(types.TypeTemporaryDocumentProcess, params.TemporaryDocument.Process)
 
 	// Register manual knowledge processing handler (cleanup + re-indexing)
 	mux.HandleFunc(types.TypeManualProcess, params.KnowledgeService.ProcessManualUpdate)
@@ -317,7 +314,6 @@ func RunAsynqServer(params AsynqTaskParams) *asynq.ServeMux {
 	mux.HandleFunc(types.TypeWikiFinalize, params.WikiIngest.Handle)
 
 	// Register long-term memory distillation handler
-	mux.HandleFunc(types.TypeMemoryExtract, params.MemoryService.Handle)
 
 	// Run the same mux on every pool. Shared and dedicated servers intentionally
 	// overlap, but Redis dequeue is atomic, so each task still executes once.

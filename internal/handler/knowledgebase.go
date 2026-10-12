@@ -34,7 +34,6 @@ type KnowledgeBaseHandler struct {
 	profileService     interfaces.KnowledgeBaseProfileService
 	knowledgeService   interfaces.KnowledgeService
 	kbShareService     interfaces.KBShareService
-	agentShareService  interfaces.AgentShareService
 	asynqClient        interfaces.TaskEnqueuer
 	vectorStoreService interfaces.VectorStoreService // enriches KB responses with bound store display
 	// userService 仅在 list 类接口里用于批量回填 creator_name；
@@ -53,7 +52,6 @@ func NewKnowledgeBaseHandler(
 	service interfaces.KnowledgeBaseService,
 	knowledgeService interfaces.KnowledgeService,
 	kbShareService interfaces.KBShareService,
-	agentShareService interfaces.AgentShareService,
 	asynqClient interfaces.TaskEnqueuer,
 	vectorStoreService interfaces.VectorStoreService,
 	userService interfaces.UserService,
@@ -67,7 +65,6 @@ func NewKnowledgeBaseHandler(
 		service:            service,
 		knowledgeService:   knowledgeService,
 		kbShareService:     kbShareService,
-		agentShareService:  agentShareService,
 		asynqClient:        asynqClient,
 		vectorStoreService: vectorStoreService,
 		userService:        userService,
@@ -478,7 +475,7 @@ func (h *KnowledgeBaseHandler) validateAndGetKnowledgeBase(
 	c *gin.Context,
 ) (*types.KnowledgeBase, string, uint64, types.OrgMemberRole, error) {
 	id := secutils.SanitizeForLog(c.Param("id"))
-	grant, err := resolveHandlerKBAccess(c, id, h.service, h.kbShareService, h.agentShareService)
+	grant, err := resolveHandlerKBAccess(c, id, h.service, h.kbShareService)
 	if err != nil {
 		return nil, id, 0, "", err
 	}
@@ -535,36 +532,8 @@ func (h *KnowledgeBaseHandler) GetKnowledgeBase(c *gin.Context) {
 func (h *KnowledgeBaseHandler) ListKnowledgeBases(c *gin.Context) {
 	ctx := c.Request.Context()
 
-	agentID := c.Query("agent_id")
-	if agentID != "" {
-		agent, err := resolveSharedAgentForRequest(c, agentID, h.agentShareService)
-		if err != nil {
-			_ = c.Error(err)
-			return
-		}
-		currentTenantID := middleware.KBAccessRequest(c).Caller.TenantID
-		scope := types.NewSharedAgentKBScope(agent)
-		if scope.IsEmpty() {
-			c.JSON(http.StatusOK, gin.H{"success": true, "data": []interface{}{}})
-			return
-		}
-		kbs, err := h.service.ListKnowledgeBasesByTenantID(ctx, agent.TenantID)
-		if err != nil {
-			logger.ErrorWithFields(ctx, err, nil)
-			c.Error(apperrors.NewInternalServerError(err.Error()))
-			return
-		}
-		kbs = filterKnowledgeBasesForSharedAgent(kbs, agent)
-		kbs = filterKnowledgeBasesForAPIKeyScope(ctx, kbs)
-
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data":    h.buildKBListResponse(ctx, kbs, currentTenantID),
-		})
-		return
-	}
-
 	// Get all knowledge bases for this tenant
+
 	kbs, err := h.service.ListKnowledgeBases(ctx)
 	if err != nil {
 		logger.ErrorWithFields(ctx, err, nil)
