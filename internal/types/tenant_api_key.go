@@ -113,9 +113,6 @@ const (
 	// APIKeyCapabilityManageModels lets a key manage tenant model
 	// definitions, credentials, model checks, and WeKnoraCloud credentials.
 	APIKeyCapabilityManageModels APIKeyCapability = "manage_models"
-	// APIKeyCapabilityManageMCPServices lets a key manage tenant MCP service
-	// definitions, credentials, tool policies, and per-principal OAuth state.
-	APIKeyCapabilityManageMCPServices APIKeyCapability = "manage_mcp_services"
 	// APIKeyCapabilityManageDataSources lets a key manage data-source
 	// connectors and sync jobs. KB scoping applies to data sources bound to a
 	// knowledge base.
@@ -134,9 +131,6 @@ const (
 	// credentials and user-controllable endpoints) rather than retrieval
 	// infrastructure.
 	APIKeyCapabilityManageStorageBackends APIKeyCapability = "manage_storage_backends"
-	// APIKeyCapabilityManageWebSearch lets a key manage tenant web-search
-	// provider configurations and credentials.
-	APIKeyCapabilityManageWebSearch APIKeyCapability = "manage_web_search"
 	// APIKeyCapabilityRunEvaluations lets a key run and inspect evaluation
 	// jobs without full tenant ownership.
 	APIKeyCapabilityRunEvaluations APIKeyCapability = "run_evaluations"
@@ -184,8 +178,6 @@ func NormalizeAPIKeyCapability(c APIKeyCapability) APIKeyCapability {
 		return APIKeyCapabilityMessageHistory
 	case APIKeyCapabilityManageModels:
 		return APIKeyCapabilityManageModels
-	case APIKeyCapabilityManageMCPServices:
-		return APIKeyCapabilityManageMCPServices
 	case APIKeyCapabilityManageDataSources:
 		return APIKeyCapabilityManageDataSources
 	case APIKeyCapabilityManageChannels:
@@ -194,8 +186,6 @@ func NormalizeAPIKeyCapability(c APIKeyCapability) APIKeyCapability {
 		return APIKeyCapabilityManageVectorStores
 	case APIKeyCapabilityManageStorageBackends:
 		return APIKeyCapabilityManageStorageBackends
-	case APIKeyCapabilityManageWebSearch:
-		return APIKeyCapabilityManageWebSearch
 	case APIKeyCapabilityRunEvaluations:
 		return APIKeyCapabilityRunEvaluations
 	case APIKeyCapabilityManageMembers:

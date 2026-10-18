@@ -110,66 +110,6 @@ func TestKBCreatorLookup_MissingTenantContext(t *testing.T) {
 	}
 }
 
-// stubAgentService mirrors stubKBService for the agent lookup tests.
-type stubAgentService struct {
-	interfaces.CustomAgentService
-	get func(ctx context.Context, id string) (*types.CustomAgent, error)
-}
-
-func (s *stubAgentService) GetAgentByID(ctx context.Context, id string) (*types.CustomAgent, error) {
-	return s.get(ctx, id)
-}
-
-func TestAgentCreatorLookup_BuiltinIsTenantOwned(t *testing.T) {
-	h := &CustomAgentHandler{service: &stubAgentService{
-		get: func(_ context.Context, _ string) (*types.CustomAgent, error) {
-			return &types.CustomAgent{
-				ID: "smart-reasoning", TenantID: 1, IsBuiltin: true, CreatedBy: "ignored",
-			}, nil
-		},
-	}}
-	creator, err := h.AgentCreatorLookup(newKBLookupCtx(t, 1, "smart-reasoning"))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if creator != "" {
-		t.Fatalf("built-in agent must surface as tenant-owned (empty creator), got %q", creator)
-	}
-}
-
-func TestAgentCreatorLookup_AgentNotFoundMapsToSentinel(t *testing.T) {
-	h := &CustomAgentHandler{service: &stubAgentService{
-		get: func(_ context.Context, _ string) (*types.CustomAgent, error) {
-			return nil, service.ErrAgentNotFound
-		},
-	}}
-	_, err := h.AgentCreatorLookup(newKBLookupCtx(t, 1, "missing-agent"))
-	if !errors.Is(err, middleware.ErrResourceNotFound) {
-		t.Fatalf("expected ErrResourceNotFound, got %v", err)
-	}
-}
-
-func TestAgentCreatorLookup_CrossTenantIsHiddenAsNotFound(t *testing.T) {
-	// Defensive: service.GetAgentByID already scopes by tenant, but
-	// AgentCreatorLookup re-checks the row's TenantID anyway. If a
-	// future refactor loosens the service-layer scope (or adds a
-	// cross-tenant variant that gets wired here by mistake), a
-	// foreign-tenant row must NEVER leak through the ownership
-	// shortcut. Pinning the contract here so the defensive branch
-	// survives refactors.
-	h := &CustomAgentHandler{service: &stubAgentService{
-		get: func(_ context.Context, _ string) (*types.CustomAgent, error) {
-			return &types.CustomAgent{
-				ID: "agent-1", TenantID: 999, CreatedBy: "u1",
-			}, nil
-		},
-	}}
-	_, err := h.AgentCreatorLookup(newKBLookupCtx(t, 1, "agent-1"))
-	if !errors.Is(err, middleware.ErrResourceNotFound) {
-		t.Fatalf("cross-tenant agent must surface as not-found, got %v", err)
-	}
-}
-
 // PR 5 (#1303) per-KB ownership lookups. The chain helper lives in the
 // service layer; the lookups here are pure adapters that translate the
 // repository sentinels into middleware.ErrResourceNotFound. Tests focus

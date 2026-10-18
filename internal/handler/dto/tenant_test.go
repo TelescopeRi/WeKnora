@@ -19,7 +19,6 @@ func TestTenantResponse_ViewerOmitsSecrets(t *testing.T) {
 	assert.NotContains(t, s, "wk-app-secret-def")
 	assert.NotContains(t, s, "parser-secret-123")
 	assert.NotContains(t, s, "minio-secret-789")
-	assert.NotContains(t, s, "web_search_config")
 	assert.NotContains(t, s, "parser_engine_config")
 	assert.NotContains(t, s, "storage_engine_config")
 	assert.NotContains(t, s, "credentials")
@@ -33,15 +32,12 @@ func TestTenantResponse_OwnerOmitsLegacyTenantAPIKey(t *testing.T) {
 	assert.NotContains(t, s, `"api_key"`)
 	assert.NotContains(t, s, "legacy-search-secret-999")
 	assert.NotContains(t, s, "parser-secret-123")
-	assert.Contains(t, s, "web_search_config")
+	assert.Contains(t, s, "parser_engine_config")
 }
 
 func TestTenantResponse_AdminGetsRedactedIntegrationConfigs(t *testing.T) {
 	tenant := sampleSecretTenant()
 	resp := NewTenantResponse(adminContext(), tenant)
-	require.NotNil(t, resp.WebSearchConfig)
-	assert.Equal(t, types.RedactedSecretPlaceholder, resp.WebSearchConfig.ProxyURL)
-	assert.Empty(t, resp.WebSearchConfig.APIKey)
 	require.NotNil(t, resp.ParserEngineConfig)
 	assert.Equal(t, types.RedactedSecretPlaceholder, resp.ParserEngineConfig.MinerUAPIKey)
 	require.NotNil(t, resp.StorageEngineConfig.MinIO)
@@ -61,10 +57,6 @@ func sampleSecretTenant() *types.Tenant {
 	return &types.Tenant{
 		ID:   42,
 		Name: "tenant",
-		WebSearchConfig: &types.WebSearchConfig{
-			APIKey:   "legacy-search-secret-999",
-			ProxyURL: "http://proxy.internal:8080",
-		},
 		Credentials: &types.CredentialsConfig{
 			WeKnoraCloud: &types.WeKnoraCloudCredentials{
 				AppID:     "wk-app-id-abc",

@@ -924,7 +924,7 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 		return
 	}
 	tenantID := caller.TenantID
-	sourceGrant, err := resolveHandlerKBAccessFor(c, req.SourceID, h.service, nil, nil, types.OrgRoleViewer)
+	sourceGrant, err := resolveHandlerKBAccessFor(c, req.SourceID, h.service, nil, types.OrgRoleViewer)
 	if err != nil {
 		c.Error(err)
 		return
@@ -948,7 +948,7 @@ func (h *KnowledgeBaseHandler) CopyKnowledgeBase(c *gin.Context) {
 			targetKB.CreatorID = caller.UserID
 		}
 	} else {
-		targetGrant, err := resolveHandlerKBAccessFor(c, req.TargetID, h.service, nil, nil, types.OrgRoleEditor)
+		targetGrant, err := resolveHandlerKBAccessFor(c, req.TargetID, h.service, nil, types.OrgRoleEditor)
 		if err != nil {
 			_ = c.Error(err)
 			return

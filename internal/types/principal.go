@@ -15,7 +15,6 @@ const (
 	PrincipalEmbedChannel    = "embed_channel"
 	PrincipalEmbedSession    = "embed_session"
 	PrincipalEmbedVisitor    = "embed_visitor"
-	PrincipalMCPEndpoint     = "mcp_endpoint"
 )
 
 // EmbedVisitorHeader is sent by the embed widget to identify a browser visitor
@@ -108,15 +107,6 @@ func EmbedVisitorIDFromContext(ctx context.Context) string {
 }
 
 // EmbedSessionPrincipal identifies a single embed visitor chat session.
-// MCPEndpointPrincipal identifies calls made through a workspace MCP
-// endpoint. Sessions and messages created by the ask tool are owned by it.
-func MCPEndpointPrincipal(tenantID uint64, endpointID string) Principal {
-	return Principal{
-		Type: PrincipalMCPEndpoint,
-		ID:   fmt.Sprintf("%d:%s", tenantID, endpointID),
-	}
-}
-
 func EmbedSessionPrincipal(tenantID uint64, channelID, sessionID string) Principal {
 	return Principal{
 		Type: PrincipalEmbedSession,
@@ -149,53 +139,13 @@ func ValidateEmbedVisitorID(id string) error {
 	return nil
 }
 
-// MCPOAuthPrincipalFromContext resolves the OAuth token principal for ctx.
-// Embed chat sessions map to a per-visitor principal when X-Embed-Visitor is
-// present; otherwise OAuth falls back to the chat session principal.
-func MCPOAuthPrincipalFromContext(ctx context.Context) Principal {
-	p, ok := PrincipalFromContext(ctx)
-	if !ok {
-		return Principal{}
-	}
-	p = p.Normalize()
-	if p.Type != PrincipalEmbedSession {
-		return p
-	}
-	visitorID := EmbedVisitorIDFromContext(ctx)
-	if visitorID == "" {
-		return p
-	}
-	parts := strings.SplitN(p.ID, ":", 3)
-	if len(parts) < 2 {
-		return p
-	}
-	tenantPart := strings.TrimSpace(parts[0])
-	channelPart := strings.TrimSpace(parts[1])
-	if tenantPart == "" || channelPart == "" {
-		return p
-	}
-	var tenantID uint64
-	if _, err := fmt.Sscanf(tenantPart, "%d", &tenantID); err != nil || tenantID == 0 {
-		return Principal{Type: PrincipalEmbedVisitor, ID: tenantPart + ":" + channelPart + ":" + visitorID}
-	}
-	return EmbedVisitorPrincipal(tenantID, channelPart, visitorID)
-}
-
 // SessionOwnerIDFromContext returns the sessions.user_id scope for the current
 // caller. API external users and embed chat sessions use principal-derived IDs;
-// tenant API keys are isolated per key id; MCP OAuth token storage uses
-// MCPOAuthPrincipalFromContext (visitor-level for embed).
-//
-// PrincipalMCPEndpoint must resolve to StorageID() too: the MCP `ask` tool
-// creates its session with `MCPEndpointPrincipal(...).StorageID()` and then
-// looks it up through this function. Without the case below the lookup falls
-// through to the raw user id ("mcp-<endpointID>"), which never matches the
-// stored owner ("mcp_endpoint:<tenantID>:<endpointID>"), so every ask call
-// failed with "failed to create user message: session not found".
+// tenant API keys are isolated per key id.
 func SessionOwnerIDFromContext(ctx context.Context) string {
 	if p, ok := PrincipalFromContext(ctx); ok {
 		switch p.Type {
-		case PrincipalAPIExternalUser, PrincipalEmbedSession, PrincipalMCPEndpoint:
+		case PrincipalAPIExternalUser, PrincipalEmbedSession:
 			return p.StorageID()
 		case PrincipalAPITenant:
 			if scope, ok := TenantAPIKeyScopeFromContext(ctx); ok && scope.KeyID > 0 {

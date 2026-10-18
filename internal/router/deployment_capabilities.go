@@ -7,16 +7,8 @@ import (
 func deploymentCapabilitiesFromRouter(params RouterParams) handler.DeploymentCapabilitiesData {
 	return handler.BuildDeploymentCapabilities(handler.Edition, handler.DeploymentFeatureAvailability{
 		Organizations: params.OrganizationHandler != nil,
-		// Match RegisterMCPEndpointRoutes.
-		MCPServer: params.MCPEndpointHandler != nil && params.MCPEndpointService != nil,
-		API:       params.TenantHandler != nil && params.TenantAPIKeyService != nil,
-		MCP: params.MCPServiceHandler != nil &&
-			params.MCPCredentialsHandler != nil &&
-			params.MCPOAuthHandler != nil,
-		WebSearch: params.WebSearchHandler != nil &&
-			params.WebSearchProviderHandler != nil &&
-			params.WebSearchCredentialsHandler != nil,
-		VectorStore: params.VectorStoreHandler != nil,
-		Storage:     params.StorageBackendHandler != nil,
+		API:           params.TenantHandler != nil && params.TenantAPIKeyService != nil,
+		VectorStore:   params.VectorStoreHandler != nil,
+		Storage:       params.StorageBackendHandler != nil,
 	})
 }

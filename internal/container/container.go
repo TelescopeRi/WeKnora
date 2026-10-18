@@ -67,9 +67,7 @@ import (
 	yuqueConnector "github.com/Tencent/WeKnora/internal/datasource/connector/yuque"
 	"github.com/Tencent/WeKnora/internal/handler"
 	"github.com/Tencent/WeKnora/internal/infrastructure/docparser"
-	infra_web_search "github.com/Tencent/WeKnora/internal/infrastructure/web_search"
 	"github.com/Tencent/WeKnora/internal/logger"
-	"github.com/Tencent/WeKnora/internal/mcp"
 	"github.com/Tencent/WeKnora/internal/models/api"
 	"github.com/Tencent/WeKnora/internal/models/embedding"
 	"github.com/Tencent/WeKnora/internal/models/limiter" // register built-in vendors
@@ -152,24 +150,14 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(repository.NewSystemSettingRepository))
 	must(container.Provide(repository.NewModelCatalogRepository))
 	must(container.Provide(neo4jRepo.NewNeo4jRepository))
-	must(container.Provide(repository.NewMCPServiceRepository))
-	must(container.Provide(repository.NewMCPOAuthRepository))
 	must(container.Provide(repository.NewOrganizationRepository))
 	must(container.Provide(repository.NewKBShareRepository))
-	must(container.Provide(repository.NewMCPEndpointRepository))
 	must(container.Provide(repository.NewUserResourceFavoriteRepository))
-	must(container.Provide(service.NewWebSearchStateService))
 	must(container.Provide(repository.NewDataSourceRepository))
 	must(container.Provide(repository.NewSyncLogRepository))
 	must(container.Provide(repository.NewWikiPageRepository))
 	must(container.Provide(repository.NewTaskPendingOpsRepository))
 	must(container.Provide(repository.NewTaskDeadLetterRepository))
-
-	// MCP manager for managing MCP client connections
-	logger.Debugf(ctx, "[Container] Registering MCP manager...")
-	must(container.Provide(mcp.NewMCPManager))
-	must(container.Invoke(registerMCPCleanup))
-	must(container.Provide(mcp.NewOAuthManager))
 
 	// Business service layer
 	logger.Debugf(ctx, "[Container] Registering business services...")
@@ -206,18 +194,10 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(func(s *service.KnowledgeBaseProfileService) interfaces.TaskHandler { return s },
 		dig.Name("knowledgeBaseProfile")))
 
-	must(container.Provide(service.NewMCPServiceService))
 	must(container.Provide(service.NewUserResourceFavoriteService))
 	must(container.Provide(service.NewWikiPageService))
 	must(container.Provide(service.NewWikiIngestService, dig.Name("wikiIngest")))
 	must(container.Provide(service.NewWikiLintService))
-	must(container.Provide(service.NewMCPEndpointService))
-
-	// Web search registry and providers
-	logger.Debugf(ctx, "[Container] Registering web search registry and providers...")
-	must(container.Provide(infra_web_search.NewRegistry))
-	must(container.Invoke(registerWebSearchProviders))
-	must(container.Provide(repository.NewWebSearchProviderRepository))
 	must(container.Provide(repository.NewVectorStoreRepository))
 	must(container.Provide(repository.NewStorageBackendRepository))
 	must(container.Provide(repository.NewResourceRepository))
@@ -225,8 +205,6 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	// TenantStoreOwnership adapter used by the retriever factory functions
 	// to verify that a resolved VectorStore belongs to the caller's tenant.
 	must(container.Provide(retriever.NewVectorStoreRepoOwnership))
-	must(container.Provide(service.NewWebSearchService))
-	must(container.Provide(service.NewWebSearchProviderService))
 	must(container.Provide(NewEngineFactory))
 	// StoreRegistry: same instance as RetrieveEngineRegistry, exposed as StoreRegistry interface.
 	// NewRetrieveEngineRegistry always returns *retriever.RetrieveEngineRegistry which implements both.
@@ -304,14 +282,8 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewInitializationHandler))
 	must(container.Provide(handler.NewAuthHandler))
 	must(container.Provide(handler.NewSystemHandler))
-	must(container.Provide(handler.NewMCPServiceHandler))
-	must(container.Provide(handler.NewMCPCredentialsHandler))
-	must(container.Provide(handler.NewMCPOAuthHandler))
 	must(container.Provide(handler.NewModelCredentialsHandler))
-	must(container.Provide(handler.NewWebSearchProviderCredentialsHandler))
 	must(container.Provide(handler.NewDataSourceCredentialsHandler))
-	must(container.Provide(handler.NewWebSearchHandler))
-	must(container.Provide(handler.NewWebSearchProviderHandler))
 	must(container.Provide(handler.NewVectorStoreHandler))
 	must(container.Provide(handler.NewStorageBackendHandler))
 	must(container.Provide(handler.NewUserResourceFavoriteHandler))
@@ -321,7 +293,6 @@ func BuildContainer(container *dig.Container) *dig.Container {
 	must(container.Provide(handler.NewDataSourceHandler))
 	// Wiki page handler
 	must(container.Provide(handler.NewWikiPageHandler))
-	must(container.Provide(handler.NewMCPEndpointHandler))
 	must(container.Provide(handler.NewWeKnoraCloudHandler))
 	logger.Debugf(ctx, "[Container] HTTP handlers registered")
 
@@ -1414,15 +1385,6 @@ func registerLangfuseCleanup(mgr *langfuse.Manager, cleaner interfaces.ResourceC
 	})
 }
 
-// registerMCPCleanup closes MCP connections on shutdown, so remote servers see
-// their sessions end instead of waiting for them to time out.
-func registerMCPCleanup(mgr *mcp.MCPManager, cleaner interfaces.ResourceCleaner) {
-	cleaner.RegisterWithName("MCPManager", func() error {
-		mgr.Shutdown()
-		return nil
-	})
-}
-
 // initDocReaderClient initializes the DocumentReader client (lightweight API).
 func initDocReaderClient(cfg *config.Config) (interfaces.DocumentReader, error) {
 	addr := strings.TrimSpace(os.Getenv("DOCREADER_ADDR"))
@@ -1532,27 +1494,6 @@ func NewDuckDB() (*sql.DB, error) {
 	return sqlDB, nil
 }
 
-// registerWebSearchProviders registers all web search provider types to the registry.
-// Each provider type is registered with its factory function that accepts parameters.
-// Provider instances are created on-demand when tenants configure them.
-func registerWebSearchProviders(registry *infra_web_search.Registry) {
-	registry.Register("duckduckgo", infra_web_search.NewDuckDuckGoProvider)
-	registry.Register("google", infra_web_search.NewGoogleProvider)
-	registry.Register("bing", infra_web_search.NewBingProvider)
-	registry.Register("tavily", infra_web_search.NewTavilyProvider)
-	registry.Register("ollama", infra_web_search.NewOllamaProvider)
-	registry.Register("baidu", infra_web_search.NewBaiduProvider)
-	registry.Register("searxng", infra_web_search.NewSearxngProvider)
-	registry.Register("keenable", infra_web_search.NewKeenableProvider)
-	registry.Register("zhipu", infra_web_search.NewZhipuProvider)
-	registry.Register("exa", infra_web_search.NewExaProvider)
-	registry.Register("metaso", infra_web_search.NewMetasoProvider)
-	registry.Register("bocha", infra_web_search.NewBochaProvider)
-	registry.Register("brave", infra_web_search.NewBraveProvider)
-	registry.Register("serply", infra_web_search.NewSerplyProvider)
-}
-
-
 // initConnectorRegistry creates and populates the connector registry with all available connectors.
 // Aggregates registration errors via errors.Join so a misconfigured or duplicated connector fails
 // container initialization loudly instead of silently disabling the feature at runtime.
@@ -1636,7 +1577,6 @@ func startHousekeepingService(svc *service.HousekeepingService, cleaner interfac
 		return nil
 	})
 }
-
 
 // startAuditLogRetention spins up the daily audit_logs purge sweep
 // and registers shutdown cleanup. Mirrors the data-source-scheduler

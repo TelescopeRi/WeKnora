@@ -29,7 +29,6 @@ var versionedSQLiteTables = []string{
 	"browser_pairings",
 	"browser_task_interruptions",
 	"fork_snapshot_leases",
-	"mcp_endpoints",
 	"message_artifacts",
 	"tenant_skills",
 	"tenant_skill_snapshots",
@@ -53,13 +52,11 @@ var versionedSQLiteColumns = map[string][]string{
 		"sandbox_config_tenant_id", // 000027
 		"host_workspace_dir",       // 000029
 	},
-	"tenant_invitations": {"token", "accepted_count"},        // 000054
-	"embed_channels":     {"allow_memory"},                   // 000060
-	"im_channels":        {"locale"},                         // 000030
-	"chunks":             {"source_locators"},                // 000033
-	"mcp_oauth_tokens":   {"principal_type", "principal_id"}, // 000064
-	"mcp_tool_approvals": {"enabled"},                        // 000091
-	"message_artifacts":  {"deleted_at"},                     // 000107
+	"tenant_invitations": {"token", "accepted_count"}, // 000054
+	"embed_channels":     {"allow_memory"},            // 000060
+	"im_channels":        {"locale"},                  // 000030
+	"chunks":             {"source_locators"},         // 000033
+	"message_artifacts":  {"deleted_at"},              // 000107
 	"tenant_skills": {
 		"envs", "served", "catalog_id", "install_session_id", "install_message_id",
 	}, // 000028
@@ -110,7 +107,6 @@ func TestSQLiteMigrationsCreateVersionedSchema(t *testing.T) {
 	require.JSONEq(t, `{"providers":{}}`, catalogOverlay)
 
 	assertSQLiteShareLinkInvitationsWork(t, db)
-	assertSQLiteMCPOAuthPrincipalUpsertWorks(t, db)
 	require.False(t, sqliteColumnExists(t, db, "knowledges", "tag_id"),
 		"SQLite migrations must drop legacy knowledges.tag_id after multi-tag migration")
 }
@@ -321,45 +317,6 @@ func assertSQLiteShareLinkInvitationsWork(t *testing.T, db *sql.DB) {
 		"SELECT COUNT(*) FROM tenant_invitations WHERE tenant_id = 1 AND invitee_user_id = '' AND status = 'pending'",
 	).Scan(&count))
 	require.Equal(t, 2, count)
-}
-
-func assertSQLiteMCPOAuthPrincipalUpsertWorks(t *testing.T, db *sql.DB) {
-	t.Helper()
-	_, err := db.Exec(
-		"INSERT INTO mcp_services (id, tenant_id, name, transport_type) VALUES (?, 1, 'svc', 'http')",
-		"svc-migration-1",
-	)
-	require.NoError(t, err)
-
-	tokenInsertPrefix := "INSERT INTO mcp_oauth_tokens " +
-		"(id, tenant_id, user_id, service_id, principal_type, principal_id, access_token) "
-	_, err = db.Exec(
-		tokenInsertPrefix +
-			"VALUES ('tok-1', 1, 'u1', 'svc-migration-1', 'web_user', 'u1', 'token-1')",
-	)
-	require.NoError(t, err)
-
-	_, err = db.Exec(
-		tokenInsertPrefix +
-			"VALUES ('tok-2', 1, 'u1', 'svc-migration-1', 'web_user', 'u1', 'token-2') " +
-			"ON CONFLICT(tenant_id, principal_type, principal_id, service_id) " +
-			"DO UPDATE SET access_token = excluded.access_token",
-	)
-	require.NoError(t, err)
-
-	var accessToken string
-	require.NoError(t, db.QueryRow(
-		"SELECT access_token FROM mcp_oauth_tokens "+
-			"WHERE tenant_id = 1 AND principal_type = 'web_user' "+
-			"AND principal_id = 'u1' AND service_id = 'svc-migration-1'",
-	).Scan(&accessToken))
-	require.Equal(t, "token-2", accessToken)
-
-	var rowCount int
-	require.NoError(t, db.QueryRow(
-		"SELECT COUNT(*) FROM mcp_oauth_tokens WHERE tenant_id = 1 AND service_id = 'svc-migration-1'",
-	).Scan(&rowCount))
-	require.Equal(t, 1, rowCount)
 }
 
 func copySQLiteMigrationsV4(t *testing.T, repoRoot string) string {

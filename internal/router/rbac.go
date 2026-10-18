@@ -36,7 +36,7 @@ import (
 //	      Viewer" hold uniformly.
 //
 //	NO  — Tenant-wide infrastructure: Model, VectorStore,
-//	      WebSearchProvider, DataSource, MCPService, WeKnoraCloud
+//	      DataSource, WeKnoraCloud
 //	      credentials.
 //	      => Mutating routes use Admin().
 //	      There is no "creator-of-the-vector-store" concept; configuring
@@ -111,7 +111,7 @@ type rbacGuards struct {
 	// Lookup closures resolve a request's :id into the resource's creator
 	// user ID. Captured up front so the handler-level methods don't have
 	// to be exported into every Register* function as well.
-	kbCreator    middleware.CreatorLookup
+	kbCreator middleware.CreatorLookup
 	// kbCreatorFromKbIDParam reads :kbId (not :id) for the
 	// /initialization/* routes whose KB is addressed by :kbId.
 	kbCreatorFromKbIDParam middleware.CreatorLookup
@@ -249,10 +249,6 @@ func apiKeyManageModels(base middleware.APIKeyRoutePolicy) middleware.APIKeyRout
 	return base.WithCapability(types.APIKeyCapabilityManageModels)
 }
 
-func apiKeyManageMCPServices(base middleware.APIKeyRoutePolicy) middleware.APIKeyRoutePolicy {
-	return base.WithCapability(types.APIKeyCapabilityManageMCPServices)
-}
-
 func apiKeyManageDataSources(base middleware.APIKeyRoutePolicy) middleware.APIKeyRoutePolicy {
 	return base.WithCapability(types.APIKeyCapabilityManageDataSources)
 }
@@ -270,10 +266,6 @@ func apiKeyManageVectorStores(base middleware.APIKeyRoutePolicy) middleware.APIK
 // backend instances without carrying vector-store or full tenant access.
 func apiKeyManageStorageBackends(base middleware.APIKeyRoutePolicy) middleware.APIKeyRoutePolicy {
 	return base.WithCapability(types.APIKeyCapabilityManageStorageBackends)
-}
-
-func apiKeyManageWebSearch(base middleware.APIKeyRoutePolicy) middleware.APIKeyRoutePolicy {
-	return base.WithCapability(types.APIKeyCapabilityManageWebSearch)
 }
 
 func apiKeyManageMembers(base middleware.APIKeyRoutePolicy) middleware.APIKeyRoutePolicy {

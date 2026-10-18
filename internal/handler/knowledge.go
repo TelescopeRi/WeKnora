@@ -2747,11 +2747,11 @@ func (h *KnowledgeHandler) MoveKnowledge(c *gin.Context) {
 	}
 
 	// Resolve explicit write grants independently for both body IDs.
-	if _, err := resolveHandlerKBAccessFor(c, req.SourceKBID, h.kbService, nil, nil, types.OrgRoleEditor); err != nil {
+	if _, err := resolveHandlerKBAccessFor(c, req.SourceKBID, h.kbService, nil, types.OrgRoleEditor); err != nil {
 		_ = c.Error(err)
 		return
 	}
-	if _, err := resolveHandlerKBAccessFor(c, req.TargetKBID, h.kbService, nil, nil, types.OrgRoleEditor); err != nil {
+	if _, err := resolveHandlerKBAccessFor(c, req.TargetKBID, h.kbService, nil, types.OrgRoleEditor); err != nil {
 		_ = c.Error(err)
 		return
 	}

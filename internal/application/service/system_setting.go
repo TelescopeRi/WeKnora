@@ -413,7 +413,6 @@ func (s *systemSettingService) preload(ctx context.Context) {
 	// Add new bridges here as more env vars get migrated.
 	s.applySSRFWhitelist(ctx)
 	s.applyModelMaxConcurrency(ctx)
-	s.applyDockerBackendEnabled(ctx)
 }
 
 // encodeDefault produces the JSONB encoding for a spec's built-in

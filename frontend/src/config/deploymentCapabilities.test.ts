@@ -27,13 +27,12 @@ test('organizations stay hidden in lite even when capabilities fail open', () =>
     false,
   )
   assert.equal(
-    isDeploymentCapabilitySupported({}, 'settings.websearch', { liteMode: true }),
+    isDeploymentCapabilitySupported({}, 'settings.vectorstore', { liteMode: true }),
     true,
   )
 })
 
 test('only route-backed settings sections require deployment capabilities', () => {
-  assert.equal(SETTINGS_SECTION_CAPABILITY.websearch, 'settings.websearch')
   assert.equal(SETTINGS_SECTION_CAPABILITY.vectorstore, 'settings.vectorstore')
   assert.equal(SETTINGS_SECTION_CAPABILITY.storage, 'settings.storage')
   assert.equal(SETTINGS_SECTION_CAPABILITY.parser, undefined)

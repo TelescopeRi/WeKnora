@@ -87,12 +87,6 @@ var contextCloneAcrossDetach = map[ContextKey]bool{
 	// the ingestion storm the governor exists to contain run past it. Keeping
 	// it can only over-throttle a context that is background by definition.
 	BackgroundTaskContextKey: true,
-	// Marks a channel that cannot resolve an in-conversation MCP OAuth prompt
-	// (an IM bot has no live client to click "Authorize"). Dropping it makes
-	// the agent block on the OAuth wait for every unauthorized service instead
-	// of emitting its one-shot notice, so the failure is a stalled reply.
-	// A detached context has no live client either, which is what this says.
-	MCPOAuthNonInteractiveContextKey: true,
 
 	// ---- Deliberately does not survive a detach ----
 	//
@@ -118,9 +112,6 @@ var contextCloneAcrossDetach = map[ContextKey]bool{
 	// request context inside the embed handler that authenticated it; nothing
 	// downstream of a detach reads it.
 	EmbedChannelContextKey: false,
-	// The authenticated MCP endpoint. Read only by the MCP tool handlers on
-	// the request context that authenticated it.
-	MCPEndpointContextKey: false,
 }
 
 // ContextKeysClonedAcrossDetach returns the keys logger.CloneContext carries

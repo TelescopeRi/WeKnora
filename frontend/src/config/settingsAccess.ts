@@ -12,7 +12,6 @@ export const SETTINGS_SECTION_MIN_ROLE: Record<string, SettingsRoleKey> = {
   ollama: 'admin',
   weknoracloud: 'admin',
   models: 'viewer',
-  websearch: 'admin',
   vectorstore: 'admin',
   parser: 'admin',
   storage: 'admin',

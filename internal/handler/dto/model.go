@@ -65,6 +65,20 @@ func SecretExtraConfigKeys(provider, baseURL string) map[string]bool {
 	return secretKeysOf(v, nil)
 }
 
+// CredentialFieldMetadata reports whether a credential field has a value
+// stored server-side, without exposing the value itself.
+type CredentialFieldMetadata struct {
+	Configured bool `json:"configured"`
+}
+
+// CredentialsResponse is the shared shape returned by PUT
+// /{resource}/{id}/credentials. Keyed by field name (e.g. "api_key",
+// "token"). The frontend uses this to update its in-memory metadata after a
+// successful save without needing to re-fetch the whole resource.
+type CredentialsResponse struct {
+	Fields map[string]CredentialFieldMetadata `json:"fields"`
+}
+
 // AllSecretExtraConfigKeys returns every extra_config key any registered
 // vendor declares secret.
 //
@@ -191,7 +205,7 @@ type ModelResponse struct {
 	CreatedAt   time.Time          `json:"created_at"`
 	UpdatedAt   time.Time          `json:"updated_at"`
 	// Per-field "configured?" map. Omitted for builtin models unless the
-	// caller is a system administrator. See MCPServiceResponse.Credentials.
+	// caller is a system administrator. See CredentialFieldMetadata.
 	Credentials map[string]CredentialFieldMetadata `json:"credentials,omitempty"`
 	// Capabilities is the catalog view of the model: protocol, whether it
 	// can think and at which levels, context window. Chat models only.

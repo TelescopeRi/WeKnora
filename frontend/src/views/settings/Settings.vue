@@ -9,17 +9,6 @@
             'has-submenu': item.children && item.children.length > 0,
             'expanded': expandedMenus.includes(item.key)
           }]" @click="handleNavClick(item)">
-            <!-- 网络搜索使用自定义 SVG 图标 -->
-            <svg v-if="item.key === 'websearch'" width="17" height="17" viewBox="0 0 18 18" fill="none"
-              xmlns="http://www.w3.org/2000/svg" class="nav-icon">
-              <circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.2" fill="none" />
-              <path d="M 9 2 A 3.5 7 0 0 0 9 16" stroke="currentColor" stroke-width="1.2" fill="none" />
-              <path d="M 9 2 A 3.5 7 0 0 1 9 16" stroke="currentColor" stroke-width="1.2" fill="none" />
-              <line x1="2.94" y1="5.5" x2="15.06" y2="5.5" stroke="currentColor" stroke-width="1.2"
-                stroke-linecap="round" />
-              <line x1="2.94" y1="12.5" x2="15.06" y2="12.5" stroke="currentColor" stroke-width="1.2"
-                stroke-linecap="round" />
-            </svg>
             <!-- WeKnora Cloud 使用自定义 W 图标 -->
             <svg v-else-if="item.key === 'weknoracloud'" width="17" height="17" viewBox="0 0 18 18"
               fill="none" xmlns="http://www.w3.org/2000/svg" class="nav-icon">
@@ -82,11 +71,6 @@
         <!-- 模型配置 -->
         <div v-if="currentSection === 'models'" class="section">
           <ModelSettings />
-        </div>
-
-        <!-- 网络搜索配置 -->
-        <div v-if="currentSection === 'websearch'" class="section">
-          <WebSearchSettings />
         </div>
 
         <!-- 向量数据库引擎 -->
@@ -169,7 +153,6 @@ import GeneralSettings from './GeneralSettings.vue'
 import ModelSettings from './ModelSettings.vue'
 import ModelCatalog from '../system/ModelCatalog.vue'
 import OllamaSettings from './OllamaSettings.vue'
-import WebSearchSettings from './WebSearchSettings.vue'
 import VectorStoreSettings from './VectorStoreSettings.vue'
 import ParserEngineSettings from './ParserEngineSettings.vue'
 import StorageBackendSettings from './StorageBackendSettings.vue'
@@ -267,7 +250,6 @@ const navItems = computed(() => {
     { key: 'ollama', icon: 'server', label: 'Ollama' },
     { key: 'weknoracloud', icon: '', label: 'WeKnora Cloud' },
     { key: 'models', icon: 'control-platform', label: t('settings.modelManagement') },
-    { key: 'websearch', icon: 'search', label: t('settings.webSearchConfig') },
     { key: 'vectorstore', icon: 'data-base', label: t('settings.vectorStoreEngine') },
     { key: 'parser', icon: 'file-search', label: t('settings.parserEngine') },
     { key: 'storage', icon: 'cloud', label: t('settings.storageEngine') },
@@ -319,7 +301,6 @@ const navGroups = computed<NavGroup[]>(() => {
         'vectorstore',
         'parser',
         'storage',
-        'websearch',
       ]),
     },
     {

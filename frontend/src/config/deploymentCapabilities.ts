@@ -1,6 +1,5 @@
 export const DEPLOYMENT_CAPABILITY_KEYS = [
   'organizations',
-  'settings.websearch',
   'settings.vectorstore',
   'settings.storage',
 ] as const
@@ -34,7 +33,6 @@ export function isDeploymentCapabilitySupported(
 }
 
 export const SETTINGS_SECTION_CAPABILITY: Partial<Record<string, DeploymentCapabilityKey>> = {
-  websearch: 'settings.websearch',
   vectorstore: 'settings.vectorstore',
   storage: 'settings.storage',
 }

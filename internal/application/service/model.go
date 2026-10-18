@@ -29,7 +29,6 @@ var ErrModelNotFound = errors.New("model not found")
 type modelService struct {
 	repo          interfaces.ModelRepository
 	kbRepo        interfaces.KnowledgeBaseRepository
-	agentRepo     interfaces.CustomAgentRepository
 	ollamaService *ollama.OllamaService
 	pooler        embedding.EmbedderPooler
 	tenantService interfaces.TenantService
@@ -38,7 +37,6 @@ type modelService struct {
 // NewModelService creates a new model service instance
 func NewModelService(repo interfaces.ModelRepository,
 	kbRepo interfaces.KnowledgeBaseRepository,
-	agentRepo interfaces.CustomAgentRepository,
 	ollamaService *ollama.OllamaService,
 	pooler embedding.EmbedderPooler,
 	tenantService interfaces.TenantService,
@@ -46,7 +44,6 @@ func NewModelService(repo interfaces.ModelRepository,
 	return &modelService{
 		repo:          repo,
 		kbRepo:        kbRepo,
-		agentRepo:     agentRepo,
 		ollamaService: ollamaService,
 		pooler:        pooler,
 		tenantService: tenantService,
@@ -525,21 +522,6 @@ func (s *modelService) getModelUsageDetails(
 		}
 		if details.KnowledgeBases == nil {
 			details.KnowledgeBases = make([]types.ModelUsageResource, 0)
-		}
-	}
-
-	agentCount, err := s.agentRepo.CountByModelID(ctx, tenantID, modelID)
-	if err != nil {
-		return details, err
-	}
-	details.AgentTotal = agentCount
-	if agentCount > 0 {
-		details.Agents, err = s.agentRepo.ListModelUsages(ctx, tenantID, modelID)
-		if err != nil {
-			return details, err
-		}
-		if details.Agents == nil {
-			details.Agents = make([]types.ModelUsageResource, 0)
 		}
 	}
 

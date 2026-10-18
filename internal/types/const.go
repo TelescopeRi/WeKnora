@@ -73,10 +73,6 @@ const (
 	// every context key, and middleware imports this package, so a key
 	// declared there could only be referred to by its raw string value.
 	EmbedChannelContextKey ContextKey = "EmbedChannel"
-	// MCPEndpointContextKey stores the authenticated *MCPEndpoint on the
-	// request context of a call arriving on the workspace MCP server surface.
-	// Declared here for the same reason as EmbedChannelContextKey.
-	MCPEndpointContextKey ContextKey = "MCPEndpoint"
 	// LangfuseTraceContextKey carries the active Langfuse *Trace across the
 	// request lifecycle. Defined here (not inside the langfuse package) so
 	// that logger.CloneContext can preserve it without importing langfuse.
@@ -95,12 +91,6 @@ const (
 	// LLMPromptPrefixFingerprintContextKey carries a non-sensitive hash of the
 	// intended reusable prompt prefix for cache diagnostics.
 	LLMPromptPrefixFingerprintContextKey ContextKey = "LLMPromptPrefixFingerprint"
-	// MCPOAuthNonInteractiveContextKey marks a request whose channel cannot
-	// resolve an in-conversation MCP OAuth prompt (e.g. an IM bot: there is no
-	// live client to click "Authorize" and call the resolve endpoint). When set,
-	// the agent emits a one-shot authorization notice and continues instead of
-	// blocking until the OAuth wait times out. See IsMCPOAuthNonInteractive.
-	MCPOAuthNonInteractiveContextKey ContextKey = "MCPOAuthNonInteractive"
 	// ChatParserEngineContextKey carries the resolved parser engine
 	// from the agent's ChatParserEngineRules for chat attachment processing.
 	ChatParserEngineContextKey ContextKey = "ChatParserEngine"

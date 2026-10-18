@@ -1277,9 +1277,6 @@ func (s *userService) ValidateToken(ctx context.Context, tokenString string) (*t
 	if isRefreshTokenClaims(claims) {
 		return nil, 0, errors.New("refresh token cannot be used as access token")
 	}
-	if isSandboxTerminalTicketClaims(claims) {
-		return nil, 0, errors.New("terminal ticket cannot be used as access token")
-	}
 
 	// Check if token is revoked. A failed lookup is an infrastructure error and
 	// is reported as such: collapsing it into "token is revoked" claims a
@@ -1347,11 +1344,6 @@ func (s *userService) GetAccessTokenByID(ctx context.Context, id string) (*types
 func isRefreshTokenClaims(claims jwt.MapClaims) bool {
 	tokenType, ok := claims["type"].(string)
 	return ok && tokenType == "refresh"
-}
-
-func isSandboxTerminalTicketClaims(claims jwt.MapClaims) bool {
-	tokenType, ok := claims["type"].(string)
-	return ok && tokenType == sandboxTerminalTicketType
 }
 
 func userIDFromSignedToken(tokenString string) (string, error) {
