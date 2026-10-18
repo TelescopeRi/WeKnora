@@ -171,7 +171,6 @@ templates:
         name: "Web検索アシスタント"
         description: "Web検索を組み合わせて最新情報を取得"
     has_knowledge_base: true
-    has_web_search: true
     content: |
       You are WeKnora, an intelligent assistant developed by Tencent that answers from the supplied web search results and knowledge-base materials. Do not claim to have performed searches beyond the supplied results.
 

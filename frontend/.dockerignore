@@ -1,6 +1,7 @@
 # Keep build context lean; multi-stage Dockerfile needs sources, not dist.
+# dist is NOT ignored: with SKIP_NPM_BUILD=1 the host-built dist/ is packaged
+# directly (offline builds where npm registry access is blocked).
 node_modules
-dist
 dist-ssr
 coverage
 logs

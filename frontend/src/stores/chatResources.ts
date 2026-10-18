@@ -2,11 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { listKnowledgeBases, getKnowledgeBaseById } from '@/api/knowledge-base'
 import { listModels, type ModelConfig } from '@/api/model'
-import { listWebSearchProviders, type WebSearchProviderEntity } from '@/api/web-search-provider'
 import { useOrganizationStore } from '@/stores/organization'
 import { createCachedResource, createKeyedSnapshotCache } from './resourceCache'
 
-type ResourceKey = 'knowledgeBases' | 'models' | 'webSearchProviders'
+type ResourceKey = 'knowledgeBases' | 'models'
 
 export type ListCreatorFilter = 'all' | 'mine' | 'others'
 
@@ -28,7 +27,6 @@ function isKbModelReady(kb: any): boolean {
 export const useChatResourcesStore = defineStore('chatResources', () => {
   const rawKnowledgeBases = ref<any[]>([])
   const allModels = ref<ModelConfig[]>([])
-  const webSearchProviders = ref<WebSearchProviderEntity[]>([])
 
   const validKnowledgeBases = computed(() => rawKnowledgeBases.value.filter(isKbModelReady))
 
@@ -52,21 +50,9 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     },
   )
 
-  const webSearchProvidersResource = createCachedResource(
-    async () => {
-      const response = await listWebSearchProviders()
-      const providers = (response as any)?.data
-      return Array.isArray(providers) ? (providers as WebSearchProviderEntity[]) : []
-    },
-    (providers) => {
-      webSearchProviders.value = providers
-    },
-  )
-
   const resources: Record<ResourceKey, ReturnType<typeof createCachedResource>> = {
     knowledgeBases: knowledgeBasesResource,
     models: modelsResource,
-    webSearchProviders: webSearchProvidersResource,
   }
 
   // 单个知识库详情：拿到过就一直用，直到显式失效。
@@ -125,17 +111,12 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     modelsResource.markLoaded()
   }
 
-  async function ensureWebSearchProviders(force = false): Promise<void> {
-    return webSearchProvidersResource.ensure(force)
-  }
-
   /** 并行预取平台页面常用的空间级资源 */
   async function prefetchPlatformResources(force = false): Promise<void> {
     const orgStore = useOrganizationStore()
     await Promise.all([
       ensureKnowledgeBases(force),
       ensureModels(force),
-      ensureWebSearchProviders(force),
       orgStore.fetchOrganizations({ force }),
     ])
   }
@@ -155,7 +136,6 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
       ;(Object.keys(resources) as ResourceKey[]).forEach((k) => resources[k].invalidate())
       rawKnowledgeBases.value = []
       allModels.value = []
-      webSearchProviders.value = []
       invalidateKnowledgeBaseDetail()
       return
     }
@@ -169,13 +149,11 @@ export const useChatResourcesStore = defineStore('chatResources', () => {
     rawKnowledgeBases,
     validKnowledgeBases,
     allModels,
-    webSearchProviders,
     isLoaded,
     fetchKnowledgeBasesForList,
     ensureKnowledgeBases,
     ensureModels,
     replaceModels,
-    ensureWebSearchProviders,
     prefetchPlatformResources,
     fetchKnowledgeBaseById,
     invalidateKnowledgeBaseDetail,

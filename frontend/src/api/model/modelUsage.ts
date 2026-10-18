@@ -151,6 +151,7 @@ export function modelUsageKnowledgeBaseSection(
 export function modelUsageResourceRoute(
   kind: ModelUsageResourceKind,
   id: string,
+  _bindings?: readonly string[],
 ) {
   return { path: `/platform/knowledge-bases/${encodeURIComponent(id)}` }
 }

@@ -10,7 +10,7 @@
             'expanded': expandedMenus.includes(item.key)
           }]" @click="handleNavClick(item)">
             <!-- WeKnora Cloud 使用自定义 W 图标 -->
-            <svg v-else-if="item.key === 'weknoracloud'" width="17" height="17" viewBox="0 0 18 18"
+            <svg v-if="item.key === 'weknoracloud'" width="17" height="17" viewBox="0 0 18 18"
               fill="none" xmlns="http://www.w3.org/2000/svg" class="nav-icon">
               <rect x="1.5" y="1.5" width="15" height="15" rx="3.5" stroke="currentColor" stroke-width="1.2"
                 fill="none" />

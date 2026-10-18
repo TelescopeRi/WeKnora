@@ -16,8 +16,8 @@ export const TENANT_API_KEY_CAPABILITIES: TenantAPIKeyCapability[] = [
   'retrieve', 'chat', 'read_agents', 'ingest', 'manage_kbs',
   'message_history', 'manage_agents', 'manage_mcp_services',
   'manage_datasources', 'manage_models', 'manage_vector_stores',
-  'manage_storage_backends', 'manage_web_search', 'manage_channels',
-  'run_evaluations', 'manage_members', 'manage_spaces',
+  'manage_storage_backends', 'manage_channels',
+  'manage_members', 'manage_spaces',
   'manage_tenant_settings',
 ]
 
@@ -72,9 +72,7 @@ export const TENANT_API_KEY_CAPABILITY_GROUPS: ApiKeyCapabilityGroup[] = [
       { value: 'manage_models', labelKey: 'integrations.api.capabilityManageModels', hintKey: 'integrations.api.capabilityManageModelsHint' },
       { value: 'manage_vector_stores', labelKey: 'integrations.api.capabilityManageVectorStores', hintKey: 'integrations.api.capabilityManageVectorStoresHint' },
       { value: 'manage_storage_backends', labelKey: 'integrations.api.capabilityManageStorageBackends', hintKey: 'integrations.api.capabilityManageStorageBackendsHint' },
-      { value: 'manage_web_search', labelKey: 'integrations.api.capabilityManageWebSearch', hintKey: 'integrations.api.capabilityManageWebSearchHint' },
       { value: 'manage_channels', labelKey: 'integrations.api.capabilityManageChannels', hintKey: 'integrations.api.capabilityManageChannelsHint' },
-      { value: 'run_evaluations', labelKey: 'integrations.api.capabilityRunEvaluations', hintKey: 'integrations.api.capabilityRunEvaluationsHint' },
       { value: 'manage_tenant_settings', labelKey: 'integrations.api.capabilityManageTenantSettings', hintKey: 'integrations.api.capabilityManageTenantSettingsHint' },
     ],
   },
