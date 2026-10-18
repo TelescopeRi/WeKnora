@@ -9,8 +9,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/dig"
 
 	"github.com/Tencent/WeKnora/internal/config"
@@ -20,7 +18,6 @@ import (
 	"github.com/Tencent/WeKnora/internal/tracing/langfuse"
 	"github.com/Tencent/WeKnora/internal/types/interfaces"
 
-	_ "github.com/Tencent/WeKnora/docs" // swagger docs
 )
 
 // RouterParams 路由参数
@@ -113,16 +110,6 @@ func NewRouter(params RouterParams) *gin.Engine {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 
-	// Swagger API 文档（仅在非生产环境下启用）
-	// 通过 GIN_MODE 环境变量判断：release 模式下禁用 Swagger
-	if gin.Mode() != gin.ReleaseMode {
-		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
-			ginSwagger.DefaultModelsExpandDepth(-1), // 默认折叠 Models
-			ginSwagger.DocExpansion("list"),         // 展开模式: "list"(展开标签), "full"(全部展开), "none"(全部折叠)
-			ginSwagger.DeepLinking(true),            // 启用深度链接
-			ginSwagger.PersistAuthorization(true),   // 持久化认证信息
-		))
-	}
 
 	// 前端静态文件（仅 Lite 版本内嵌前端）
 	if handler.Edition == "lite" {

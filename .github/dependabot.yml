@@ -102,19 +102,6 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
-  - package-ecosystem: npm
-    directory: "/miniprogram"
-    schedule:
-      interval: monthly
-    open-pull-requests-limit: 0
-    ignore:
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
-    groups:
-      miniprogram-security:
-        applies-to: security-updates
-        patterns: ["*"]
-
   # ─── Python ───
   - package-ecosystem: pip
     directory: "/docreader"
